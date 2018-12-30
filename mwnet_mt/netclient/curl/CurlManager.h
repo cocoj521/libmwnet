@@ -16,7 +16,8 @@ namespace curl
 /**
  * curlm句柄的管理者，可管理多个简单句柄
  */
-class CurlManager : noncopyable
+class CurlManager : noncopyable,
+					public std::enable_shared_from_this<CurlManager>
 {
 public:
 	enum Option
@@ -43,9 +44,12 @@ public:
 	static CurlRequestPtr getRequest(const std::string& url, bool bKeepAlive, int req_type, int http_ver);
 
 	// 发送请求
-	//0:成功 1:队列满
+	//0:成功 1:尚未初始化 2:发送缓冲满 3:超过总的最大并发数
 	int sendRequest(const CurlRequestPtr& request);
 
+	// 处理中断请求
+	void forceCancelRequest(uint64_t req_uuid);
+	
 	/**
 	 * [读事件的响应函数]
 	 * @param fd [事件的套接口]
@@ -80,8 +84,12 @@ private:
 	// 将请求移出管理器
 	void removeMultiHandle(const CurlRequestPtr& request);
 
+	// 处理curl_multi_info_read返回的响应
 	void afterRequestDone(const CurlRequestPtr& request);
 	
+	// 内部定时器超时响应函数
+	void innerTimerTimeOut(uint64_t req_uuid);
+
 	// curlm socket事件回调CURLMOPT_SOCKETFUNCTION CURL_POLL_IN/OUT/INOUT/REMOVE
 	static int curlmSocketOptCb(CURL* c, int fd, int what, void* userp, void* socketp);
 	int curlmSocketOptCbInLoop(CURL* c, int fd, int what, void* socketp);

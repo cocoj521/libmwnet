@@ -25,10 +25,13 @@ public:
 public:
 	void setMaxSize(int total_host, int single_host);
 	CurlRequestPtr find(CURL* c);
+	CurlRequestPtr find(uint64_t req_uuid);
 	CurlRequestPtr get(CURL* c);
 	void add(const CurlRequestPtr& request);
 	void remove(const CurlRequestPtr& request);
 	bool isFull();
+	// 清空前会回调所有未返回的请求
+	void clear();
 private:
 	HttpRequesting();
 private:
@@ -55,6 +58,9 @@ public:
 	void setMaxSize(int max_wait);
 	bool isFull();
 	bool add(const CurlRequestPtr& request);
+	int  size() const;
+	// 清空前会回调所有未返回的请求
+	void clear();
 	CurlRequestPtr get();
 private:
 	HttpWaitRequest();
@@ -64,6 +70,7 @@ private:
 	// 等待发送的请求
 	std::mutex mutex_wait_request_;
 	std::list<CurlRequestPtr> wait_requests_;
+	int list_size_;
 };
 
 // 已回收的请求
@@ -79,12 +86,15 @@ public:
 public:
 	CurlRequestPtr get();
 	void recycle(const CurlRequestPtr& request);
+	int  size() const;
+	void clear();
 private:
-	HttpRecycleRequest(){};
+	HttpRecycleRequest(){list_size_=0;};
 private:
 	// 已回收的请求
 	std::mutex mutex_recycle_request_;
 	std::list<CurlRequestPtr> recycle_requests_;
+	int list_size_;
 };
 
 } // end namespace curl

@@ -51,6 +51,20 @@ CurlRequestPtr HttpRequesting::find(CURL* c)
 	return p;
 }
 
+CurlRequestPtr HttpRequesting::find(uint64_t req_uuid)
+{
+	CurlRequestPtr p = nullptr;
+
+	std::lock_guard<std::mutex> lock(mutex_requesting_);
+	std::map<uint64_t, CurlRequestPtr>::iterator it = requestings_.find(req_uuid);
+	if (it != requestings_.end())
+	{
+		p = it->second;
+	}
+	
+	return p;
+}
+
 CurlRequestPtr HttpRequesting::get(CURL* c)
 {
 	CurlRequestPtr p = nullptr;
@@ -69,10 +83,22 @@ CurlRequestPtr HttpRequesting::get(CURL* c)
 	return p;
 }
 
+// 清空前会回调所有未返回的请求
+void HttpRequesting::clear()
+{
+	std::lock_guard<std::mutex> lock(mutex_requesting_);
+	std::map<uint64_t, CurlRequestPtr>::iterator it = requestings_.begin();
+	for (; it != requestings_.end(); ++it)
+	{
+		it->second->forceCancel();
+	}
+}
+
 ///////////////////////////////////////////////////////////////////
 HttpWaitRequest::HttpWaitRequest()
 	:
-	max_wait_request_(MAX_WAIT_REQUEST)
+	max_wait_request_(MAX_WAIT_REQUEST),
+	list_size_(0)
 {
 }
 
@@ -81,9 +107,14 @@ void HttpWaitRequest::setMaxSize(int max_wait)
 	max_wait_request_ = max_wait;
 }
 
+int  HttpWaitRequest::size() const
+{
+	return list_size_;
+}
+
 bool HttpWaitRequest::isFull()
 {
-	return (static_cast<int>(wait_requests_.size()) > max_wait_request_);
+	return (list_size_ > max_wait_request_);
 }
 
 bool HttpWaitRequest::add(const CurlRequestPtr& request)
@@ -91,9 +122,10 @@ bool HttpWaitRequest::add(const CurlRequestPtr& request)
 	bool bRet = false;
 	
 	std::lock_guard<std::mutex> lock(mutex_wait_request_);
-	if (static_cast<int>(wait_requests_.size()) < max_wait_request_)
+	if (list_size_ < max_wait_request_)
 	{
-		wait_requests_.push_back(request);
+		wait_requests_.push_back(request);
+		++list_size_;
 		bRet = true;
 	}
 
@@ -109,9 +141,24 @@ CurlRequestPtr HttpWaitRequest::get()
 	{
 		p = wait_requests_.front();
 		wait_requests_.pop_front();
+		--list_size_;
 	}
 	
 	return p;
+}
+
+// 清空前会回调所有未返回的请求
+void HttpWaitRequest::clear()
+{	
+	std::lock_guard<std::mutex> lock(mutex_wait_request_);
+	std::list<CurlRequestPtr>::iterator it = wait_requests_.begin();
+	for (; it != wait_requests_.end(); )
+	{
+		(*it)->req_time_ = CurlRequest::now();
+		(*it)->done(10055, "Force Cancel Request");
+		wait_requests_.erase(it++);
+		--list_size_;
+	}
 }
 
 /////////////////////////////////////////////////////////////////
@@ -125,6 +172,7 @@ CurlRequestPtr HttpRecycleRequest::get()
 	{
 		p = recycle_requests_.front();
 		recycle_requests_.pop_front();
+		--list_size_;
 	}
 
 	return p;
@@ -134,4 +182,12 @@ void HttpRecycleRequest::recycle(const CurlRequestPtr& request)
 {
 	std::lock_guard<std::mutex> lock(mutex_recycle_request_);
 	recycle_requests_.push_back(request);
+	++list_size_;
+}
+
+void HttpRecycleRequest::clear()
+{
+	std::lock_guard<std::mutex> lock(mutex_recycle_request_);
+	recycle_requests_.clear();
+	list_size_ = 0;
 }

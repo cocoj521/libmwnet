@@ -18,7 +18,8 @@ CurlRequest::CurlRequest(const std::string& url, uint64_t req_uuid, bool bKeepAl
 	  fd_(-1),
 	  req_type_(req_type),
 	  url_(url),
-	  http_ver_(http_ver)
+	  http_ver_(http_ver),
+	  entire_timeout_(60)
 {
 	initCurlRequest(url, req_uuid, bKeepAlive, req_type, http_ver);
 }
@@ -78,7 +79,7 @@ void CurlRequest::initCurlRequest(const std::string& url, uint64_t req_uuid, boo
 	// 设为不验证证书
 	curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl_, CURLOPT_SSL_VERIFYHOST, 0L);
-	curl_easy_setopt(curl_, CURLOPT_CAINFO, "./cacert.pem");
+	curl_easy_setopt(curl_, CURLOPT_CAINFO, "./notfound.pem");
 	
 	// 默认user-agent
 	curl_easy_setopt(curl_, CURLOPT_USERAGENT, curl_version());
@@ -107,8 +108,11 @@ void CurlRequest::initCurlRequest(const std::string& url, uint64_t req_uuid, boo
 	curl_easy_setopt(curl_, CURLOPT_PRIVATE, p);
 	//curl_easy_setopt(curl_, CURLOPT_PRIVATE, this);
 
+	// 允许重定向
 	curl_easy_setopt(curl_, CURLOPT_FOLLOWLOCATION, 1L);
-	
+	// maximum number of redirects allowed
+	curl_easy_setopt(curl_, CURLOPT_MAXREDIRS, 2L);
+
 	curl_easy_setopt(curl_, CURLOPT_NOSIGNAL, 1L);
 
 	//禁用全局dns cache
@@ -167,15 +171,15 @@ int CurlRequest::hookOpenSocket(void *clientp, curlsocktype purpose, struct curl
 	CurlRequest* p = static_cast<CurlRequest*>(clientp);
 	if (p)
 	{
-		fd = ::socket(address->family, address->socktype, address->protocol);
+		 p->fd_ = fd = ::socket(address->family, address->socktype, address->protocol);
 	}
-	LOG_DEBUG << "hookOpenSocket:" << fd;
+	LOG_INFO << "hookOpenSocket:" << fd;
 	return fd;
 }
 
 int CurlRequest::hookCloseSocket(void *clientp, int fd)
 {
-	LOG_DEBUG << "CurlRequest::hookCloseSocket:" << fd;
+	LOG_INFO << "CurlRequest::hookCloseSocket:" << fd;
 	CurlRequest* p = static_cast<CurlRequest*>(clientp);
 	if (p)
 	{
@@ -187,6 +191,7 @@ int CurlRequest::hookCloseSocket(void *clientp, int fd)
 
 void CurlRequest::setTimeOut(long conn_timeout, long entire_timeout)
 {
+	entire_timeout_ = entire_timeout;
 	// 设置entire超时时间
 	curl_easy_setopt(curl_, CURLOPT_TIMEOUT, entire_timeout);
 	// 设置connect超时时间
@@ -206,13 +211,20 @@ void CurlRequest::setDnsCacheTimeOut(long cache_timeout)
 	curl_easy_setopt(curl_, CURLOPT_DNS_CACHE_TIMEOUT, cache_timeout);
 }
 
-void CurlRequest::request(CURLM* multi, EventLoop* loop)
+// 取消请求
+void CurlRequest::forceCancel()
+{
+	LOG_INFO << "CurlRequest::forceCancel " << req_uuid_;
+	loop_->queueInLoop(std::bind(&CurlManager::forceCancelRequest, cm_, req_uuid_));
+}
+
+void CurlRequest::request(CurlManager* cm, CURLM* multi, EventLoop* loop)
 {
 	// 将头部信息加入curl
 	setHeaders();
 
 	// 管理器的指针
-	//cm_ = cm;
+	cm_ = cm;
 	
 	// 管理器的loop
 	loop_ = loop;
@@ -322,6 +334,7 @@ std::string CurlRequest::getResponseContentType()
 
 void CurlRequest::done(int errCode, const char* errDesc)
 {
+	LOG_INFO << "CurlRequest::done";
 	rsp_time_ = CurlRequest::now();
 	
 	double total_time;

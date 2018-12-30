@@ -8,6 +8,7 @@
 #include <boost/any.hpp>
 #include <sys/time.h>
 #include <mwnet_mt/net/EventLoop.h>
+#include <mwnet_mt/net/TimerId.h>
 
 extern "C"
 {
@@ -42,17 +43,20 @@ public:
 	 * @param url  [URL地址]
 	 * @param req_uuid  [唯一标识]
 	 */
-	CurlRequest(const    std::string& url, uint64_t req_uuid, bool bKeepAlive, int req_type, int http_ver);
+	CurlRequest(const std::string& url, uint64_t req_uuid, bool bKeepAlive, int req_type, int http_ver);
 
 	~CurlRequest();
 
 	// 初始化请求参数
-	void initCurlRequest(const    std::string& url, uint64_t req_uuid, bool bKeepAlive, int req_type, int http_ver);
+	void initCurlRequest(const std::string& url, uint64_t req_uuid, bool bKeepAlive, int req_type, int http_ver);
 	
 	/**
 	 * 发起请求
 	 */
-	void request(CURLM* multi, EventLoop* loop);
+	void request(CurlManager* cm, CURLM* multi, EventLoop* loop);
+
+	// 强制取消请求
+	void forceCancel();
 
 	/**
 	 * 从multi中移除
@@ -243,9 +247,7 @@ private:
 	// 事件循环器
 	EventLoop* loop_;
 	// curl管理类指针
-	//CurlManager* cm_;
-	// mwnet_mt中使用它表示一个通道，底层会跟epoll打交道
-	//std::shared_ptr<Channel> channel_;
+	CurlManager* cm_;
 	// 包体回调函数
 	DataCallback bodyCb_;
 	// 包头回调函数
@@ -277,6 +279,8 @@ public:
 	uint64_t rsp_time_;
 	uint64_t req_time_;
 	uint64_t req_inque_time_;
+	TimerId timerid_;
+	long entire_timeout_;
 };
 
 } // end namespace curl

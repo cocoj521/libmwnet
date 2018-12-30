@@ -47,7 +47,7 @@ void CurlManager::delEvLoop(void* p, int fd, int what)
 int CurlManager::curlmSocketOptCbInLoop(CURL* c, int fd, int what, void* socketp)
 {
 	const char *whatstr[]={ "none", "IN", "OUT", "INOUT", "REMOVE" };
-	LOG_DEBUG << "CurlManager::curlmSocketOptCbInLoop [" << this << "] [" << socketp << "] fd=" << fd
+	LOG_INFO << "CurlManager::curlmSocketOptCbInLoop [" << this << "] [" << socketp << "] fd=" << fd
 			  << " what=" << whatstr[what];
 
 	// 事件移除
@@ -98,6 +98,8 @@ int CurlManager::curlmSocketOptCbInLoop(CURL* c, int fd, int what, void* socketp
 
 int CurlManager::curlmSocketOptCb(CURL* c, int fd, int what, void* userp, void* socketp)
 {
+	LOG_DEBUG << "CurlManager::curlmSocketOptCb fd=" << fd;
+
 	CurlManager* cm = static_cast<CurlManager*>(userp);
 	
 	if (NULL == cm || fd <= 0) return 0;
@@ -137,16 +139,17 @@ int CurlManager::curlmTimerCb(CURLM* curlm, long ms, void* userp)
 
 void CurlManager::cancelTimer()
 {
-	if (timerid_.getSeq() > 0) loop_->cancel(timerid_);
+	loop_->cancel(timerid_);
 }
 
 void CurlManager::createTimer(long ms)
 {
 	// 先取消timer
-	if (timerid_.getSeq() > 0) loop_->cancel(timerid_);
+	loop_->cancel(timerid_);
 	
 	// 再创建
-	timerid_ = loop_->runAfter(static_cast<int>(ms)/1000.0, std::bind(&CurlManager::curlmTimerCbInLoop, this, ms));
+	timerid_ = loop_->runAfter(static_cast<int>(ms)/1000.0, 
+				std::bind(&CurlManager::curlmTimerCbInLoop, shared_from_this(), ms));
 }
 
 void CurlManager::curlmTimerCbInLoop(long ms)
@@ -156,7 +159,7 @@ void CurlManager::curlmTimerCbInLoop(long ms)
 	if (0 == ms)
 	{
 		// 先取消已有timer
-		if (timerid_.getSeq() > 0) loop_->cancel(timerid_);
+		loop_->cancel(timerid_);
 	
 		curl_multi_socket_action(curlm_, CURL_SOCKET_TIMEOUT, 0, &runningHandles_);
 	}
@@ -193,7 +196,7 @@ CurlManager::CurlManager(EventLoop* loop)
 	curl_multi_setopt(curlm_, CURLMOPT_TIMERFUNCTION, &CurlManager::curlmTimerCb);
 	curl_multi_setopt(curlm_, CURLMOPT_TIMERDATA, this);
 
-	// curl 7.30以上版本才支持
+	// 没必要设置，上层总是要根据业务逻辑控制的，底层取默认值：不限
 	//if (maxtotalconns > 0) curl_multi_setopt(curlm_, CURLMOPT_MAX_TOTAL_CONNECTIONS, maxtotalconns);
 	//if (maxhostconns > 0) curl_multi_setopt(curlm_, CURLMOPT_MAX_HOST_CONNECTIONS, maxhostconns);
 	//if (maxconns > 0) curl_multi_setopt(curlm_, CURLMOPT_MAXCONNECTS, maxconns);
@@ -205,6 +208,8 @@ CurlManager::CurlManager(EventLoop* loop)
 
 CurlManager::~CurlManager()
 {
+	// 析构要注意定时器，loop等安全退出
+	//cancelTimer();
 	curl_multi_cleanup(curlm_);
 }
 
@@ -245,16 +250,24 @@ void CurlManager::onRecvWakeUpNotify()
 }
 
 // 发送请求
-int CurlManager::sendRequest(const CurlRequestPtr& request)
+int CurlManager::sendRequest(const CurlRequestPtr& request)
 {
 	int nRet = 0;
 
 	request->req_inque_time_ = CurlRequest::now();
 	
-	// 加入待发队列
-	if (!HttpWaitRequest::GetInstance().add(request))
+	// 先判断是否超过最大并发数
+	if (HttpRequesting::GetInstance().isFull())
 	{
-		nRet = 1;
+		nRet = 3;
+	}
+	else
+	{
+		// 加入待发队列
+		if (!HttpWaitRequest::GetInstance().add(request))
+		{
+			nRet = 2;
+		}
 	}
 	
 	// 通知发送
@@ -265,10 +278,14 @@ int CurlManager::sendRequest(const CurlRequestPtr& request)
 
 void CurlManager::sendRequestInLoop(const CurlRequestPtr& request)
 {
+	// 启一个内部定时器检测超时，以防curl不回调，超时时间在curl基础上增加3秒
+	long tm = request->entire_timeout_+3;
+	request->timerid_ = loop_->runAfter(static_cast<int>(tm)/1.0, 
+						std::bind(&CurlManager::innerTimerTimeOut, shared_from_this(), request->getReqUUID()));
 	// 先加入发送中
 	HttpRequesting::GetInstance().add(request);
 	// 发送请求
-	request->request(curlm_, loop_);
+	request->request(this, curlm_, loop_);
 }
 
 void CurlManager::onReadEventCallBack(int fd)
@@ -303,7 +320,7 @@ void CurlManager::check_multi_info()
 				CurlRequestPtr request = HttpRequesting::GetInstance().find(c);
 				if (request && request->getCurl() == c)
 				{
-					LOG_DEBUG <<"check_multi_info::" << request.get() << " ========>>>>done:" << curl_easy_strerror(retCode);
+					LOG_INFO <<"check_multi_info::" << request.get() << " done:" << curl_easy_strerror(retCode);
 					request->done(retCode, curl_easy_strerror(retCode));
 
 					afterRequestDone(request);
@@ -317,13 +334,51 @@ void CurlManager::check_multi_info()
 	prevRunningHandles_ = runningHandles_;
 }
 
-
 void CurlManager::afterRequestDone(const CurlRequestPtr& request)
 {
+	// 移除内部定时器
+	loop_->cancel(request->timerid_);
 	// 将请求移出管理器
 	removeMultiHandle(request);
 	// 回收请求,视情况而定是回收重用还是直接释放
 	recycleRequest(request);
+}
+
+void CurlManager::forceCancelRequest(uint64_t req_uuid)
+{
+	LOG_INFO << "CurlManager::forceCancelRequest " << req_uuid;
+
+	CurlRequestPtr request = HttpRequesting::GetInstance().find(req_uuid);
+	if (request)
+	{
+		// 移除内部定时器
+		loop_->cancel(request->timerid_);
+		// 将请求移出管理器
+		removeMultiHandle(request);
+		// 将请求从发送中队列移除
+		HttpRequesting::GetInstance().remove(request);
+		// 回调中断请求
+		loop_->queueInLoop(std::bind(&CurlRequest::done, request, 10055, "Force Cancel Request"));
+		//request->done(10055, "Force Cancel Request");
+	}
+}
+
+// 内部定时器超时响应函数
+void CurlManager::innerTimerTimeOut(uint64_t req_uuid)
+{
+	LOG_INFO << "CurlManager::innerTimerTimeOut";
+
+	CurlRequestPtr request = HttpRequesting::GetInstance().find(req_uuid);
+	if (request)
+	{
+		// 将请求移出管理器
+		removeMultiHandle(request);
+		// 将请求从发送中队列移除
+		HttpRequesting::GetInstance().remove(request);
+		// 回调内部定时器超时
+		loop_->queueInLoop(std::bind(&CurlRequest::done, request, 10028, "Inner Timer TimeOut"));
+		//request->done(10028, "Inner Timer TimeOut");
+	}
 }
 
 // 将请求移出管理器

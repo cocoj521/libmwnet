@@ -98,6 +98,11 @@ public:
 	int    GetRspCode() const;
 
 	//获取错误代码
+	// 0:成功
+	// curl的错误码为1~93 
+	// 库内部有定时器会检测超时，以防curl的超时失效，超时意义与curl的相似，在curl错误码的基础上增加了10000，以示区分
+	// 10028:当内部定时检测到超时时间已到但curl仍未超时回调时会返回10028
+	// 10055:当程序退出时会将所有未发送的请求全部回调，并返回10055，表示发送失败
 	int	   GetErrCode() const;
 
 	//获取错误描述
@@ -183,11 +188,10 @@ public:
 	//初始化函数，在curlhttpclient生命周期内，只可调用一次
 	bool InitHttpClient(void* pInvoker,				/*上层调用的类指针*/
 						pfunc_onmsg_cb pFnOnMsg, 	/*与回应相关的事件回调(recv)*/
-						bool enable_ssl=false,		/*是否加载ssl.如不需要https,可以不加载*/
 						int nIoThrNum=4,			/*IO工作线程数*/
-						int nMaxReqQueSize=20000,   /*请求队列中允许缓存的待请求数量,超过该值会返回失败*/
-						int nMaxTotalConns=10000,	/*总的最大允许的并发请求数，超过该数量再请求会返回失败*/	
-						int nMaxHostConns=20		/*单个host最大允许的并发请求数，超过该数量再请求会返回失败*/
+						int nMaxReqQueSize=20000,   /*请求队列中允许缓存的待请求数量(应小于等于nMaxTotalConns，若超过将取nMaxTotalConns),超过该值会返回失败*/
+						int nMaxTotalConns=50000,	/*总的最大允许的并发请求数(一台服务器最多65535，请设置<=60000)，超过该数量再请求会返回失败*/	
+						int nMaxHostConns=5			/*单个host最大允许的并发请求数（暂不生效）*/
 						);
 
 	//获取HttpRequest
@@ -197,16 +201,24 @@ public:
 															    					*/
 									HTTP_VERSION http_ver=HTTP_1_1,	 				/*http请求版本,1.0,1.1,2.0 etc.*/
 									HTTP_REQUEST_TYPE req_type=HTTP_REQUEST_POST,	/*请求方式:post/get*/
-									bool bKeepAlive=false							/*长连接/短连接*/
+									bool bKeepAlive=false							/*长连接/短连接,暂只支持一个地址的长连接,若需要往多个地址上发送请求,不可以使用长连接*/
 									);
 
 	//发送http请求
-	int  SendHttpRequest(const boost::any& params, 			/*每次请求携带的任意数据,回调返回时会返回*/
-							const HttpRequestPtr& request);	/*完整的http请求数据,每次请求前调用GetHttpRequest,并填充*/
+	//0:成功 1:尚未初始化 2:发送缓冲满 3:超过总的最大并发数 
+	int  SendHttpRequest(const HttpRequestPtr& request,	 /*完整的http请求数据,每次请求前调用GetHttpRequest获取,然后并填充所需参数*/
+						const boost::any& params);		 /*每次请求可携带一个任意数据,回调返回时会返回,建议填写智能指针*/
 	
-	// 获取待回应数量
-	int  GetWaitRspCnt();
+	// 取消请求，当请求未发送或已发送但还没回应时有效，会通过回调函数返回
+	void CancelHttpRequest(const HttpRequestPtr& request);
 
+	// 获取待回应数量
+	int  GetWaitRspCnt() const;
+
+	// 获取待发请求数量
+	int  GetWaitReqCnt() const;
+
+	// 退出
 	void ExitHttpClient();
 private:
 	void Start();
@@ -227,10 +239,16 @@ private:
 	std::atomic<uint64_t> total_req_;
 	// 待回应的数量
 	std::atomic<int> wait_rsp_;
+	// 最大并发连接数
 	int MaxTotalConns_;
+	// 单host最大并发连接数
 	int MaxHostConns_;
+	// io线程数
 	int IoThrNum_;
+	// 请求队列缓存的最大数量
 	int MaxReqQueSize_;
+	// 退出标记
+	bool exit_;
 };
 
 }

@@ -24,14 +24,15 @@ std::string strBody =
 const std::string https_url = "https://tscs1.800ct.cn:7102/MWGate/wmgw.asmx";
 //const std::string https_url = "https://61.145.229.28:7102/MWGate/wmgw.asmx";
 
-const std::string https_jdtest = "https://175.25.17.163:8022/MWGate/wmgw.asmx/MongateCsSpSendSmsNew";
+const std::string https_jdtest = "https://175.25.17.163:443/sms/v2/std/batch_send";
 const std::string http_jdtest = "http://175.25.17.163:8026/MWGate/wmgw.asmx/MongateCsSpSendSmsNew";
 
 //const std::string https_url = "https://www.baidu.com";
 //const std::string url2 = "https://192.169.2.26:8088/MWGate/wmgw.asmx";
 //const std::string url1 = "http://192.169.2.53:8088/MWGate/wmgw.asmx";
 //const std::string url2 = "http://192.169.2.53:8088/MWGate/wmgw.asmx";
-const std::string http_url = "http://192.169.0.231:1235/sms/v2/std/single_send";
+//const std::string http_url = "http://192.169.0.231:1235/sms/v2/std/single_send";
+const std::string http_url = "http://192.169.1.130:1234/sms/v2/std/single_send";
 
 typedef std::function<void ()> THREAD_TASK;
 
@@ -73,12 +74,16 @@ void test(const std::string& strUrlTest)
 		http_request->SetBody(strBodyTmp);
 		
 		boost::any params;
-		while (0 != http_cli.SendHttpRequest(params, http_request))
+		while (0 != http_cli.SendHttpRequest(http_request, params))
 		{
 			LOG_INFO << "-=-=-=-=-=-=-=SendHttpRequest Error-=-=-=-==-=";
 			usleep(1000*1000);
 		}
 		
+		//sleep(10);
+		//http_cli.CancelHttpRequest(http_request);
+		//LOG_INFO << "-=-=-=-=-=-=-=CancelHttpRequest-=-=-=-==-=";
+		//sleep(3600);
 		LOG_DEBUG << "SendHttpRequest:" << http_request->GetReqUUID();
 	}
 	else
@@ -127,7 +132,7 @@ int main(int argc, char* argv[])
 	  	mwnet_mt::Logger::setOutput(outputFunc);
 	  	mwnet_mt::Logger::setFlush(flushFunc);
 	}
-	http_cli.InitHttpClient(NULL, func_onmsg_cb, true, 4, 20000, 3000);
+	http_cli.InitHttpClient(NULL, func_onmsg_cb, true, 4, 10000, 10000);
 	ThreadPoolPtr pPool(new mwnet_mt::ThreadPool("testcurl"));
 	pPool->setMaxQueueSize(20000);
 	pPool->start(4);
@@ -147,7 +152,10 @@ int main(int argc, char* argv[])
 	{
 		if (0 == bHttps)
 		{
-			pPool->run(std::bind(test, http_url));
+			for (int cnt = 0; cnt < 1000; ++cnt)
+			{
+				pPool->run(std::bind(test, http_url));
+			}
 		}
 		else if (1 == bHttps)
 		{
@@ -166,6 +174,8 @@ int main(int argc, char* argv[])
 		{
 			pPool->run(std::bind(test, http_jdtest));
 		}
+		//sleep(3);
+		//http_cli.ExitHttpClient();
 		sleep(3600);
 		return 0;
 	}

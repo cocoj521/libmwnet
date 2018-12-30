@@ -274,7 +274,8 @@ CurlHttpClient::CurlHttpClient() :
 	MaxTotalConns_(10000),
 	MaxHostConns_(20),	
 	IoThrNum_(4),
-	MaxReqQueSize_(50000)
+	MaxReqQueSize_(50000),
+	exit_(false)
 {
 	total_req_ = 0;
 	// 申请一个线程将loop跑在线程里
@@ -285,11 +286,14 @@ CurlHttpClient::CurlHttpClient() :
 		// 保存mainloop
 		main_loop_ = pLoopThr;
 	}
+	// 初始化curl库
+	CurlManager::initialize(CurlManager::kCURLssl);
 }
 
 CurlHttpClient::~CurlHttpClient()
 {
-	// 不能直接析构，要等该回应的连接都回了才退，否则丢数据，core
+	ExitHttpClient();
+	CurlManager::uninitialize();
 }
 
 void CurlHttpClient::DoneCallBack(const boost::any& _any, int errCode, const char* errDesc)
@@ -339,19 +343,22 @@ void CurlHttpClient::DoneCallBack(const boost::any& _any, int errCode, const cha
 
 bool CurlHttpClient::InitHttpClient(void* pInvoker,
 									pfunc_onmsg_cb pFnOnMsg,
-									bool enable_ssl,
 									int nIoThrNum,
 									int nMaxReqQueSize,
 									int nMaxTotalConns,
 									int nMaxHostConns)
 {
 	bool bRet = false;	
+
 	m_pInvoker = pInvoker;
 	m_pfunc_onmsg_cb = pFnOnMsg;
 	MaxTotalConns_ = nMaxTotalConns;
 	MaxHostConns_ = nMaxHostConns;
 	IoThrNum_ = nIoThrNum;
+	nMaxReqQueSize>nMaxTotalConns?nMaxReqQueSize=nMaxTotalConns:1;
 	MaxReqQueSize_   = nMaxReqQueSize;
+	total_req_ = 0;
+	wait_rsp_ = 0;
 
 	HttpRequesting::GetInstance().setMaxSize(MaxTotalConns_, MaxHostConns_);
 	HttpWaitRequest::GetInstance().setMaxSize(MaxReqQueSize_);
@@ -366,9 +373,6 @@ bool CurlHttpClient::InitHttpClient(void* pInvoker,
 		// 保存io_loop
 		io_loop_ = io_loop;
 		
-		// 初始化curl库
-		CurlManager::initialize(enable_ssl?CurlManager::kCURLssl:CurlManager::kCURLnossl);
-		
 		std::shared_ptr<CountDownLatch> latchPtr(new CountDownLatch(nIoThrNum));
 		latch_ = latchPtr;
 		
@@ -376,6 +380,8 @@ bool CurlHttpClient::InitHttpClient(void* pInvoker,
 
 		latchPtr->wait();
 
+		exit_ = false;
+		
 		bRet = true;
 	}
 	return bRet;
@@ -388,6 +394,7 @@ void CurlHttpClient::Start()
 	{
 		io_loop->start();
 		std::shared_ptr<CountDownLatch> latchPtr(boost::any_cast<std::shared_ptr<CountDownLatch>>(latch_));
+		httpclis_.clear();
 		// 初始化若干个curl对象
 		for (int i = 0; i < IoThrNum_; i++)
 		{
@@ -418,64 +425,85 @@ HttpRequestPtr CurlHttpClient::GetHttpRequest(const std::string& strUrl, HTTP_VE
 }
 
 //发送http请求
-int  CurlHttpClient::SendHttpRequest(const boost::any& params, const HttpRequestPtr& request)
+int  CurlHttpClient::SendHttpRequest(const HttpRequestPtr& request, const boost::any& params)
 {
-	int n = (++wait_rsp_ - MaxTotalConns_);
-
-	std::shared_ptr<CountDownLatch> latchPtr(boost::any_cast<std::shared_ptr<CountDownLatch>>(latch_));
-
-	if (n > 0) latchPtr->addAndWait(n);
-	
-	// 取发送中队列未满的管理器
-	uint64_t count = total_req_.load();
-	uint64_t index = count % static_cast<uint64_t>(httpclis_.size());
-	boost::any& _any = httpclis_[index];
-	
-	std::shared_ptr<CurlManager> curlm = boost::any_cast<std::shared_ptr<CurlManager>>(_any);
-
-	int nRet = -1;
-	
-	CurlRequestPtr curl_req = boost::any_cast<CurlRequestPtr>(request->GetContext());
-	if (curl_req)
-	{		
-		curl_req->setContext(params);
-		nRet = curlm->sendRequest(curl_req);
-	}
-
-	if (0 == nRet) 
+	int nRet = 1;
+	if (!exit_)
 	{
-		++total_req_;
+		int n = (++wait_rsp_ - MaxTotalConns_);
+
+		std::shared_ptr<CountDownLatch> latchPtr(boost::any_cast<std::shared_ptr<CountDownLatch>>(latch_));
+
+		if (n > 0) latchPtr->addAndWait(n);
+		
+		// 取发送中队列未满的管理器
+		uint64_t count = total_req_.load();
+		uint64_t index = count % static_cast<uint64_t>(httpclis_.size());
+		boost::any& _any = httpclis_[index];
+		
+		if (!_any.empty())
+		{
+			std::shared_ptr<CurlManager> curlm = boost::any_cast<std::shared_ptr<CurlManager>>(_any);
+		
+			CurlRequestPtr curl_req = boost::any_cast<CurlRequestPtr>(request->GetContext());
+			if (curl_req)
+			{		
+				curl_req->setContext(params);
+				nRet = curlm->sendRequest(curl_req);
+			}
+		}
+
+		if (0 == nRet) 
+		{
+			++total_req_;
+		}
+		else
+		{
+			--wait_rsp_;
+		}
 	}
-	else
-	{
-		--wait_rsp_;
-	}
-	
 	return nRet;
 }
 
+void CurlHttpClient::CancelHttpRequest(const HttpRequestPtr& request)
+{
+	CurlRequestPtr curl_req = boost::any_cast<CurlRequestPtr>(request->GetContext());
+	if (curl_req)
+	{
+		curl_req->forceCancel();
+	}
+}
+
 // 获取待回应数量
-int  CurlHttpClient::GetWaitRspCnt()
+int  CurlHttpClient::GetWaitRspCnt() const
 {
 	return wait_rsp_.load();
 }
 
+// 获取待发请求数量
+int  CurlHttpClient::GetWaitReqCnt() const
+{
+	return HttpWaitRequest::GetInstance().size();
+}
+
 void CurlHttpClient::ExitHttpClient()
 {
-	// 置退出标记
-	
-	// 将所有未回调的请求全部回调
+	LOG_INFO << "CurlHttpClient::ExitHttpClient";
 
-	// 退出每一个curlmanager
-	
-	// httpclis_.clear();
-
-	// 退出ioloop
-	// 将boost::any置空，自动析构ioloop
-	// boost::any _any;
-	// io_loop_ = _any;
-	
-	CurlManager::uninitialize();
+	if (!exit_)
+	{
+		// 置退出标记
+		exit_ = true;
+		// 将所有未回调的请求全部回调
+		HttpRequesting::GetInstance().clear();
+		HttpRecycleRequest::GetInstance().clear();
+		HttpWaitRequest::GetInstance().clear();
+		// 退出每一个curlmanager
+		//????.......确保curlmanager的loop中没有数据了再退出
+		// 退出ioloop,将boost::any置空，自动析构ioloop
+		//boost::any _any;
+		//io_loop_ = _any;
+	}
 }
 
 }
