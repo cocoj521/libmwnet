@@ -1,0 +1,5 @@
+This is an proof of concept implementation of Google Protobuf RPC using mwnet_mt.
+The object lifetime management is for from ideal and doesn't follow the usual
+mwnet_mt approach.
+
+Please consider using http://github.com/chenshuo/mwnet_mt-protorpc instead.
