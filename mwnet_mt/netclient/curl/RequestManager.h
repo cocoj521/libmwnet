@@ -58,7 +58,7 @@ public:
 	void setMaxSize(int max_wait);
 	bool isFull();
 	bool add(const CurlRequestPtr& request);
-	int  size() const;
+	int  size();
 	// 清空前会回调所有未返回的请求
 	void clear();
 	CurlRequestPtr get();
@@ -85,12 +85,17 @@ public:
 	~HttpRecycleRequest(){};
 public:
 	CurlRequestPtr get();
+	void setMaxSize(int max_recycle_cnt);
 	void recycle(const CurlRequestPtr& request);
-	int  size() const;
 	void clear();
 private:
-	HttpRecycleRequest(){list_size_=0;};
+	HttpRecycleRequest()
+	{
+		list_size_=0;
+		max_recycle_cnt_=MAX_TOTAL_REQUESTING;
+	};
 private:
+	int max_recycle_cnt_;
 	// 已回收的请求
 	std::mutex mutex_recycle_request_;
 	std::list<CurlRequestPtr> recycle_requests_;

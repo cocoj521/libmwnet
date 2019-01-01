@@ -63,7 +63,12 @@ public:
 
 	//设置dns域名解析缓存超时时间,若不指定具体的时间,默认同一域名60s内只解析一次
 	void 	SetDnsCacheTimeOut(int cache_timeout=60);
-	
+
+	// 设置https校验对端、校验host、证书地址(暂不生效。默认不校验对端，不校验host，无需证书)
+	void 	SetHttpsVerifyPeer();
+	void 	SetHttpsVerifyHost();
+	void	SetHttpsCAinfo(const std::string& strCAinfo/*证书地址*/);
+
 	//获取本次请求的惟一req_uuid
 	uint64_t GetReqUUID() const;
 	
@@ -189,8 +194,8 @@ public:
 	bool InitHttpClient(void* pInvoker,				/*上层调用的类指针*/
 						pfunc_onmsg_cb pFnOnMsg, 	/*与回应相关的事件回调(recv)*/
 						int nIoThrNum=4,			/*IO工作线程数*/
-						int nMaxReqQueSize=20000,   /*请求队列中允许缓存的待请求数量(应小于等于nMaxTotalConns，若超过将取nMaxTotalConns),超过该值会返回失败*/
-						int nMaxTotalConns=50000,	/*总的最大允许的并发请求数(一台服务器最多65535，请设置<=60000)，超过该数量再请求会返回失败*/	
+						int nMaxReqQueSize=10000,   /*请求队列中允许缓存的待请求数量(应小于等于nMaxTotalConns，若超过将取nMaxTotalConns),超过该值会返回失败*/
+						int nMaxTotalConns=10000,	/*总的最大允许的并发请求数(一台服务器最多65535，请设置<=60000的值)，超过该数量再请求会返回失败*/	
 						int nMaxHostConns=5			/*单个host最大允许的并发请求数（暂不生效）*/
 						);
 
@@ -205,9 +210,11 @@ public:
 									);
 
 	//发送http请求
-	//0:成功 1:尚未初始化 2:发送缓冲满 3:超过总的最大并发数 
+	//0:成功 1:尚未初始化 2:发送队列满(超过了nMaxReqQueSize) 3:超过总的最大并发数(超过了nMaxTotalConns) 
 	int  SendHttpRequest(const HttpRequestPtr& request,	 /*完整的http请求数据,每次请求前调用GetHttpRequest获取,然后并填充所需参数*/
-						const boost::any& params);		 /*每次请求可携带一个任意数据,回调返回时会返回,建议填写智能指针*/
+						const boost::any& params,		 /*每次请求可携带一个任意数据,回调返回时会返回,建议填写智能指针*/
+						bool WaitORreturnIfOverMaxTotalConns=false); /*超过总的最大并发数后，选择阻塞等待还是直接返回失败*/ 
+																	 /*false:直接失败 true:阻塞等待并发减少后再发送*/	 
 	
 	// 取消请求，当请求未发送或已发送但还没回应时有效，会通过回调函数返回
 	void CancelHttpRequest(const HttpRequestPtr& request);

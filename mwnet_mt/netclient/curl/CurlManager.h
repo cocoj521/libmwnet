@@ -62,6 +62,8 @@ public:
 	 */
 	void onWriteEventCallBack(int fd);
 
+	// 判断事件循环中是否还有未完成事件
+	bool isLoopRunning();
 private:
 	// 通知发送
 	void notifySendRequest();

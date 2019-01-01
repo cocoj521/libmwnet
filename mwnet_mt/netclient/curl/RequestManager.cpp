@@ -13,12 +13,14 @@ HttpRequesting::HttpRequesting()
 
 void HttpRequesting::setMaxSize(int total_host, int single_host)
 {
+	//std::lock_guard<std::mutex> lock(mutex_requesting_);
 	max_total_requesting_ = total_host;
 	max_host_requesting_  = single_host;
 }
 
 bool HttpRequesting::isFull()
 {
+	//std::lock_guard<std::mutex> lock(mutex_requesting_);
 	return (static_cast<int>(requestings_.size()) > max_total_requesting_);
 }
 
@@ -104,16 +106,19 @@ HttpWaitRequest::HttpWaitRequest()
 
 void HttpWaitRequest::setMaxSize(int max_wait)
 {
+	//std::lock_guard<std::mutex> lock(mutex_wait_request_);
 	max_wait_request_ = max_wait;
 }
 
-int  HttpWaitRequest::size() const
+int  HttpWaitRequest::size()
 {
+	//std::lock_guard<std::mutex> lock(mutex_wait_request_);
 	return list_size_;
 }
 
 bool HttpWaitRequest::isFull()
 {
+	std::lock_guard<std::mutex> lock(mutex_wait_request_);
 	return (list_size_ > max_wait_request_);
 }
 
@@ -178,9 +183,21 @@ CurlRequestPtr HttpRecycleRequest::get()
 	return p;
 }
 
+void HttpRecycleRequest::setMaxSize(int max_recycle_cnt)
+{
+	//std::lock_guard<std::mutex> lock(mutex_recycle_request_);
+	max_recycle_cnt_ = max_recycle_cnt;
+}
+
 void HttpRecycleRequest::recycle(const CurlRequestPtr& request)
 {
 	std::lock_guard<std::mutex> lock(mutex_recycle_request_);
+	// 保持recycle队列的大小不超出设定的值
+	if (list_size_ >= max_recycle_cnt_)
+	{
+		recycle_requests_.pop_front();
+		--list_size_;
+	}
 	recycle_requests_.push_back(request);
 	++list_size_;
 }

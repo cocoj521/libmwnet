@@ -1217,7 +1217,7 @@ int main(int argc, char* argv[])
 
 		if (time(NULL) - tStart > 10)
 		{
-			m_pNetServer1->StopTcpServer();
+			//m_pNetServer1->StopTcpServer();
 			time(&tStart);
 			//delete m_pNetServer1;
 			//break;

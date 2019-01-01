@@ -1,6 +1,7 @@
 #include "CurlRequest.h"
 #include "CurlManager.h"
 #include "CurlHttpClient.h"
+#include "RequestManager.h"
 #include <mwnet_mt/base/Logging.h>
 #include <assert.h>
 
@@ -121,13 +122,25 @@ void CurlRequest::initCurlRequest(const std::string& url, uint64_t req_uuid, boo
 	// 接管curl的closesocket,socket的关闭交由httprequest结束时关闭channel时再做
 	// 如果socket的关闭交由curl管理，由于时序问题，会造成fd复用，上层无法及时获取，所以由上层来关闭
 	curl_easy_setopt(curl_, CURLOPT_CLOSESOCKETFUNCTION, &CurlRequest::hookCloseSocket);
-	curl_easy_setopt(curl_, CURLOPT_CLOSESOCKETDATA, this);
+	curl_easy_setopt(curl_, CURLOPT_CLOSESOCKETDATA, p);
 
 	// socket的创建由上层完成
-	curl_easy_setopt(curl_, CURLOPT_OPENSOCKETFUNCTION, &CurlRequest::hookOpenSocket);
-	curl_easy_setopt(curl_, CURLOPT_OPENSOCKETDATA, this);
+	//curl_easy_setopt(curl_, CURLOPT_OPENSOCKETFUNCTION, &CurlRequest::hookOpenSocket);
+	//curl_easy_setopt(curl_, CURLOPT_OPENSOCKETDATA, this);
 
 	curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
+}
+
+// 关闭socket
+void closeFd(const CurlRequestPtr& p, int fd)
+{
+	LOG_DEBUG << "CurlRequest::closeFd:" << fd;
+
+	if (fd > 0)
+	{
+		::shutdown(fd, SHUT_RDWR);
+		::close(fd);
+	}
 }
 
 CurlRequest::~CurlRequest()
@@ -139,7 +152,8 @@ CurlRequest::~CurlRequest()
 	cleanCurlHandles();
 
 	// 关闭socket
-	//closeChannelFd();
+	//closeFd(nullptr, fd_);
+	//fd_ = -1;
 	
 	LOG_DEBUG  << "CurlRequest: ~CurlRequest";
 }
@@ -153,18 +167,6 @@ void CurlRequest::cleanCurlHandles()
 	curl_easy_cleanup(curl_);
 }
 
-// 关闭socket
-void closeFd(int fd)
-{
-	LOG_DEBUG << "CurlRequest::closeFd:" << fd;
-
-	if (fd > 0)
-	{
-		::shutdown(fd, SHUT_RDWR);
-		::close(fd);
-	}
-}
-
 int CurlRequest::hookOpenSocket(void *clientp, curlsocktype purpose, struct curl_sockaddr *address)
 {
 	int fd = -1;
@@ -173,18 +175,25 @@ int CurlRequest::hookOpenSocket(void *clientp, curlsocktype purpose, struct curl
 	{
 		 p->fd_ = fd = ::socket(address->family, address->socktype, address->protocol);
 	}
-	LOG_INFO << "hookOpenSocket:" << fd;
+	LOG_DEBUG << "hookOpenSocket:" << fd;
 	return fd;
 }
 
 int CurlRequest::hookCloseSocket(void *clientp, int fd)
 {
-	LOG_INFO << "CurlRequest::hookCloseSocket:" << fd;
-	CurlRequest* p = static_cast<CurlRequest*>(clientp);
+	LOG_DEBUG << "CurlRequest::hookCloseSocket:" << fd;
+	//CurlRequest* p = static_cast<CurlRequest*>(clientp);
+	uint64_t req_uuid = reinterpret_cast<uint64_t>(clientp);
+	CurlRequestPtr p = HttpRequesting::GetInstance().find(req_uuid);
 	if (p)
 	{
+		p->fd_ = -1;
 		// 放入loop, 关闭socket
-		p->loop_->queueInLoop(std::bind(closeFd, fd));
+		p->loop_->queueInLoop(std::bind(closeFd, p, fd));
+	}
+	else
+	{
+		closeFd(nullptr, fd);
 	}
 	return 0;
 }
@@ -214,7 +223,7 @@ void CurlRequest::setDnsCacheTimeOut(long cache_timeout)
 // 取消请求
 void CurlRequest::forceCancel()
 {
-	LOG_INFO << "CurlRequest::forceCancel " << req_uuid_;
+	LOG_DEBUG << "CurlRequest::forceCancel " << req_uuid_;
 	loop_->queueInLoop(std::bind(&CurlManager::forceCancelRequest, cm_, req_uuid_));
 }
 
@@ -334,7 +343,7 @@ std::string CurlRequest::getResponseContentType()
 
 void CurlRequest::done(int errCode, const char* errDesc)
 {
-	LOG_INFO << "CurlRequest::done";
+	LOG_DEBUG << "CurlRequest::done";
 	rsp_time_ = CurlRequest::now();
 	
 	double total_time;

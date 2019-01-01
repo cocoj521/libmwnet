@@ -337,7 +337,7 @@ void CurlHttpClient::DoneCallBack(const boost::any& _any, int errCode, const cha
 		uint64_t nSpeed = now_req - total_req;
 		total_req = now_req;
 		tLast = tNow;
-		LOG_INFO << "SPEED:" << nSpeed/nTmDiff << " TOTAL:" << now_req << " WAIT:" << wait_rsp_.load();
+		LOG_DEBUG << "SPEED:" << nSpeed/nTmDiff << " TOTAL:" << now_req << " WAIT:" << wait_rsp_.load();
 	}
 }
 
@@ -362,7 +362,8 @@ bool CurlHttpClient::InitHttpClient(void* pInvoker,
 
 	HttpRequesting::GetInstance().setMaxSize(MaxTotalConns_, MaxHostConns_);
 	HttpWaitRequest::GetInstance().setMaxSize(MaxReqQueSize_);
-	
+	HttpRecycleRequest::GetInstance().setMaxSize(MaxTotalConns_);
+
 	EventLoopThreadPtr main_loop(boost::any_cast<EventLoopThreadPtr>(main_loop_));
 	if (main_loop)
 	{
@@ -425,7 +426,7 @@ HttpRequestPtr CurlHttpClient::GetHttpRequest(const std::string& strUrl, HTTP_VE
 }
 
 //发送http请求
-int  CurlHttpClient::SendHttpRequest(const HttpRequestPtr& request, const boost::any& params)
+int  CurlHttpClient::SendHttpRequest(const HttpRequestPtr& request, const boost::any& params, bool WaitORreturnIfOverMaxTotalConns)
 {
 	int nRet = 1;
 	if (!exit_)
@@ -434,7 +435,10 @@ int  CurlHttpClient::SendHttpRequest(const HttpRequestPtr& request, const boost:
 
 		std::shared_ptr<CountDownLatch> latchPtr(boost::any_cast<std::shared_ptr<CountDownLatch>>(latch_));
 
-		if (n > 0) latchPtr->addAndWait(n);
+		if (n > 0 && WaitORreturnIfOverMaxTotalConns) 
+		{
+			latchPtr->addAndWait(n);
+		}
 		
 		// 取发送中队列未满的管理器
 		uint64_t count = total_req_.load();
@@ -500,7 +504,23 @@ void CurlHttpClient::ExitHttpClient()
 		HttpWaitRequest::GetInstance().clear();
 		// 退出每一个curlmanager
 		//????.......确保curlmanager的loop中没有数据了再退出
+		std::vector<boost::any>::iterator it = httpclis_.begin();
+		for (; it != httpclis_.end(); ++it)
+		{
+			std::shared_ptr<CurlManager> curlm = boost::any_cast<std::shared_ptr<CurlManager>>(*it);
+			// 最多等多少次
+			int maxWaitCnt = 50;
+			while (curlm->isLoopRunning()) 
+			{
+				usleep(1000*100);
+				if (--maxWaitCnt <= 0) 
+				{
+					break;
+				}
+			}
+		}
 		// 退出ioloop,将boost::any置空，自动析构ioloop
+		// 暂不强制析构io_loop,下次init时会自动析构,若析构curlhttpclient会自动析构
 		//boost::any _any;
 		//io_loop_ = _any;
 	}

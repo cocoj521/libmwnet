@@ -72,6 +72,8 @@ public:
 	// KEEPINTVL: interval time between keep-alive probes
 	void setKeepAliveTime(long keep_idle=30, long keep_intvl=10);
 
+	bool isKeepAlive() {return keep_alive_;}
+
 	void setDnsCacheTimeOut(long cache_timeout=60);
 	
 	/**
