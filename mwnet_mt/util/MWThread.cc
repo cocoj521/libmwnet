@@ -42,7 +42,7 @@ int Thread::JoinThread()
 	int nRet = -1;
 	ThreadPtr pThr(boost::any_cast<ThreadPtr>(m_any));
 	if (pThr && pThr->started())
-	{
+	{ 
 		nRet = pThr->join();
 	}
 	return nRet;
