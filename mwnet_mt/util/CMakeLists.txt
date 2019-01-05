@@ -4,7 +4,7 @@ set(util_SRCS
 	MWThreadPool.cc
 	MWSafeLock.cc
 	MWAtomicInt.cc
-	MWLogger.cc
+	../logger/MWLogger.cc
 	MWTimestamp.cc
 	MWCountDownLatch.cc
 	MWStringUtil.cc
@@ -26,7 +26,7 @@ set(HEADERS
 	MWThreadPool.h
 	MWSafeLock.h
 	MWAtomicInt.h
-	MWLogger.h
+	../logger/MWLogger.h
 	MWTimestamp.h
 	MWCountDownLatch.h
 	MWStringUtil.h

@@ -1,4 +1,4 @@
-#include "../MWLogger.h"
+#include "../../logger/MWLogger.h"
 
 using namespace MWLOGGER;
 
