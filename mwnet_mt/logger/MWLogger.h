@@ -27,7 +27,7 @@ public:
 	LogStream& operator<<(long long);
 	LogStream& operator<<(unsigned long long);
 	LogStream& operator<<(const void*);
-	LogStream& operator<<(float v);
+	LogStream& operator<<(float v); 
 	LogStream& operator<<(double);
 	LogStream& operator<<(char v);
 	LogStream& operator<<(const char* str);

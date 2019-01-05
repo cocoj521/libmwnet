@@ -45,5 +45,5 @@ set(HEADERS
 #file(GLOB HEADERS "*.h")
 install(FILES ${HEADERS} DESTINATION include/mwnet_mt/logger)
 
-add_executable(logger_mwlogger_test tests/logger_test.cpp)
+add_executable(logger_mwlogger_test tests/logger_test.cpp) 
 target_link_libraries(logger_mwlogger_test mwlogger)

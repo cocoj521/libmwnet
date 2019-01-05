@@ -14,7 +14,7 @@ std::string getTime()
 
 int main()
 {
-	const char* objLogp[] = { "zbs"};
+	const char* objLogp[] = {"zbs"};
 	MWLOGGER::Logger::SetLogParams();
 	MWLOGGER::Logger::CreateLogObjs("", "zbs", 1, objLogp, false);
 	int n = 0;
