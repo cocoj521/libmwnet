@@ -33,14 +33,14 @@ set(HEADERS
   )
 install(FILES ${HEADERS} DESTINATION include/mwnet_mt/util)
 
-add_executable(util_test tests/util_test.cpp)
-target_link_libraries(util_test mwnet_mt_util)
+add_executable(util_util_test tests/util_test.cpp)
+target_link_libraries(util_util_test mwnet_mt_util mwlogger)
 
-add_executable(logger_test tests/logger_test.cpp)
-target_link_libraries(logger_test mwnet_mt_util)
+add_executable(util_mwlogger_test tests/logger_test.cpp)
+target_link_libraries(util_mwlogger_test mwnet_mt_util mwlogger)
 
-add_executable(timestamp_test tests/timestamp_test.cpp)
-target_link_libraries(timestamp_test mwnet_mt_util) 
+add_executable(util_timestamp_test tests/timestamp_test.cpp)
+target_link_libraries(util_timestamp_test mwnet_mt_util mwlogger) 
 
-add_executable(countdownlatch_test tests/countdownlatch_test.cpp)
-target_link_libraries(countdownlatch_test mwnet_mt_util) 
+add_executable(util_countdownlatch_test tests/countdownlatch_test.cpp)
+target_link_libraries(util_countdownlatch_test mwnet_mt_util mwlogger) 

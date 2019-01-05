@@ -106,6 +106,7 @@ add_subdirectory(mwnet_mt/net)
 add_subdirectory(mwnet_mt/netserver)
 add_subdirectory(mwnet_mt/netclient)
 add_subdirectory(mwnet_mt/netclient/curl)
+add_subdirectory(mwnet_mt/logger)
 add_subdirectory(mwnet_mt/util)
 add_subdirectory(mwnet_mt/msgfiles)
 
