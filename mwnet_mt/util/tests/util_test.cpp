@@ -3,7 +3,7 @@
 #include <mwnet_mt/util/MWThreadPool.h>
 #include <mwnet_mt/util/MWSafeLock.h>
 #include <mwnet_mt/util/MWAtomicInt.h>
-#include <mwnet_mt/logger/MWLogger.h>
+#include <mwnet_mt/util/MWLogger.h>
 #include <mwnet_mt/util/MWStringUtil.h>
 
 
