@@ -237,6 +237,8 @@ void TcpConnection::sendInLoop(const void* data, size_t len, const boost::any& p
 		OUTBUFFER_PTR output(new OUTPUT_STRUCT(remaining));
 		output->params = params; 
 		output->outputBuffer_.append(static_cast<const char*>(data)+nwrote, remaining);
+		outputBufferList_.push_back(output);
+		++sendQueSize_;
 		// 如果有要求发送超时间时间，则加入定时器
 		if (timeout > 0)
 		{
@@ -244,8 +246,6 @@ void TcpConnection::sendInLoop(const void* data, size_t len, const boost::any& p
 												std::bind(&TcpConnection::sendTimeoutCallBack, 
 												shared_from_this(), --outputBufferList_.end()));
 		}
-		outputBufferList_.push_back(output);
-		++sendQueSize_;
 
 		// 触发高水位?
 		if (sendQueSize_ >= highWaterMark_ && highWaterMarkCallback_)
