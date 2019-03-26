@@ -803,8 +803,8 @@ bool Logger::CreateLogObjs(const std::string& basepath, const std::string& based
 		mkdir((strBakPath + it).c_str(), 0755);
 	}
 
-// 	g_dealLogFile.SetParams(g_zip_day, g_save_day, strBakPath, strBasePath, g_vLogFiles);
-// 	g_dealLogFile.StartJob();
+	g_dealLogFile.SetParams(g_zip_day, g_save_day, strBakPath, strBasePath, g_vLogFiles);
+	g_dealLogFile.StartJob();
 
 	return true;
 }

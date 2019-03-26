@@ -46,7 +46,7 @@ using namespace MWNET_MT::CURL_HTTPCLIENT;
 // 回调函数
 int func_onmsg_cb(void* pInvoker, uint64_t req_uuid, const boost::any& params, const HttpResponsePtr& response)
 {
-	if (response->GetErrCode() != 0)
+	if (1/*response->GetErrCode() != 0*/)
 	{
 		LOG_INFO 
 				 << "URL:" << response->GetEffectiveUrl() << ",code:" << response->GetErrCode() << ",desc:" << response->GetErrDesc() 
@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
 		// 实时速度 3秒一次
 		if ((time(NULL)-t2) >= 3) 
 		{
-			if (!bPrintLog) printf("now,totalcnt:%d,waitsndcnt:%d,waitrspcnt:%d,spd:%d\n", 
+			printf("now,totalcnt:%d,waitsndcnt:%d,waitrspcnt:%d,spd:%d\n", 
 									totalsend-ttmp, 
 									http_cli.GetWaitReqCnt(),
 									http_cli.GetWaitRspCnt(), 
