@@ -97,7 +97,7 @@ bool LogFile::rollFile()
 {
   time_t now = time(NULL);  
 
-  if (now > lastRoll_)
+  if (now != lastRoll_)
   {
    	string filename = getLogFileName(basepath_, basename_, now);
 	time_t start = (now + k8HourToSeconds_) / kRollPerSeconds_ * kRollPerSeconds_;
