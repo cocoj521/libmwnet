@@ -163,12 +163,22 @@ void* ThreadSendAndRecv(void*)
 		char szRecvBuf[1024+1] = {0};
 		//int nBufLen = strlen(szBuf);
 		//int nSendLen = sprintf(szSendBuf, szHttpHeader, g_szIp, nBufLen, szBuf);
+		if (4 == g_nMode)
+		{
+			memset(g_szSendMsg, 0, sizeof(g_szSendMsg));
+			strcpy(g_szSendMsg, "\r\n\r\n");
+		}
 		int nSendLen = strlen(g_szSendMsg);
 		int nStart = GetTickCount();
 		int nRet = 0;
 		if (-1 != (nRet=send(sockClient,g_szSendMsg,nSendLen,0)))
 		{
-			if (3 != g_nMode)
+			if (4 == g_nMode)
+			{
+				bOK = false;
+				close(sockClient);
+			}
+			else if (3 != g_nMode)
 			{
 				if (-1 != (nRet=recv(sockClient, szRecvBuf, 1024, 0)))
 				{
@@ -255,7 +265,7 @@ int main()
 	scanf("%d", &nConnNum);
 	getchar();
 
-	printf("input run mode(1:active test 2:loop send 3:only send):");
+	printf("input run mode(1:active test 2:loop send 3:only send 4:send^r^n^r^n):");
 	scanf("%d", &g_nMode);
 	getchar();
 	

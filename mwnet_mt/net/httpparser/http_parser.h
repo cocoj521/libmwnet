@@ -141,11 +141,11 @@ enum http_method
   };
 
 //parser type
-enum http_parser_type { HTTP_REQUEST, HTTP_RESPONSE, HTTP_BOTH };
+enum http_parser_type { HTTP_REQUEST=1, HTTP_RESPONSE, HTTP_BOTH };
 //request type
-enum http_parser_request_type {HTTP_REQUEST_POST, HTTP_REQUEST_GET, HTTP_REQUEST_UNKNOWN};
+enum http_parser_request_type {HTTP_REQUEST_POST=1, HTTP_REQUEST_GET, HTTP_REQUEST_UNKNOWN};
 //content-type
-enum http_parser_content_type {CONTENT_TYPE_XML, CONTENT_TYPE_JSON, CONTENT_TYPE_URLENCODE, CONTENT_TYPE_UNKNOWN};
+enum http_parser_content_type {CONTENT_TYPE_XML=1, CONTENT_TYPE_JSON, CONTENT_TYPE_URLENCODE, CONTENT_TYPE_UNKNOWN};
 
 /* Flag values for http_parser.flags field */
 enum flags

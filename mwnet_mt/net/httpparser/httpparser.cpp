@@ -287,6 +287,7 @@ namespace mw_http_parser
 			m_pUrl = (char*)at;
     	}
 		m_nUrlLen += length;
+		printf("handleUrl-%s,%ld\r\n", m_pUrl, length);
         return 0;
     }
 
@@ -615,7 +616,7 @@ namespace mw_http_parser
 #pragma GCC diagnostic error "-Wconversion"
 
 		m_bParseOver = true;
-		
+		printf("handleMessageComplete-%s,%ld\r\n", m_pUrl, m_nUrlLen);
         return onMessageComplete();
     }
 
@@ -674,7 +675,7 @@ namespace mw_http_parser
 		{
 			nErrCode = 0;
 		}
-		
+
 		over = m_bParseOver;
 
 		if (m_pBegin == NULL)

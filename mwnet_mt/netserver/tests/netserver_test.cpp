@@ -725,7 +725,7 @@ int func_on_readmsg_http(void* pInvoker, uint64_t conn_uuid, const boost::any& c
 	}
 	std::string strUrl = "";std::string strBody = "";
 	pHttpReq->GetUrl(strUrl);
-	//printf("url:%s\n", strUrl.c_str());
+	printf("func_on_readmsg_http:%s\n", strUrl.c_str());
 	bool bKeepAlive = pHttpReq->IsKeepAlive();
 	//printf("keepalive:%d\n", bKeepAlive);
 	//pHttpReq->GetBodyData(strBody);

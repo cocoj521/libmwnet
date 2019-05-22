@@ -107,7 +107,7 @@ struct ThreadData
 	  LOG_SYSERR << "exception caught in Thread:" << name_ << "\n" 
 	  			 << "reason: " << ex.what() << "\n"
 	  			 << "stack trace: " << ex.stackTrace() << "\n" ;
-     // abort();
+      //abort();
     }
     catch (const std::exception& ex)
     {

@@ -846,7 +846,7 @@ int HttpRequest::GetRequestType() const
 	{
 		return psr->get_http_request_type();
 	}
-	return 0;
+	return HTTP_REQUEST_UNKNOWN;
 }
 
 // 获取SOAPAction(仅当是soap时才有用)
@@ -1039,6 +1039,18 @@ int	HttpRequest::ParseHttpRequest(const char* data, size_t len, size_t maxlen, b
 	HttpParser* parser = reinterpret_cast<HttpParser* >(p);
 	if (parser)
 	{
+		//限制错误的长度
+		if (len <= 0 || len > maxlen) 
+		{
+			return nRet = 1;
+		}
+
+		//如果数据刚来开头就是"\r","\n"直接拒绝,如果是残包,则继续接收
+		if ((data[0] == '\r' || data[0] == '\n') && !m_bIncomplete)
+		{
+			return nRet = 1;
+		}
+		
 		// 如果是未收完整的包,先附加上到上次保存的部分,然后再使用存储的部分进行解析
 		if (m_bIncomplete) SaveIncompleteData(data, len);
 		nRet = parser->execute_http_parse(m_bIncomplete?m_strRequest.c_str():data, m_bIncomplete?m_strRequest.size():len, over);
@@ -1552,7 +1564,8 @@ private:
 				// 包已收完，并解析完，回调给上层
 				if (bParseOver)
 				{
-					if (m_pfunc_on_readmsg_http)
+					int nReqType = reqptr->GetRequestType();				
+					if (m_pfunc_on_readmsg_http && (nReqType == HTTP_REQUEST_POST || nReqType == HTTP_REQUEST_GET)) //discard unknown request
 					{
 						WeakTcpConnectionPtr weakconn(conn);
 						int nRet = m_pfunc_on_readmsg_http(m_pInvoker, conn->getConnuuid(), weakconn, conn->getSessionData(), reqptr.get());
