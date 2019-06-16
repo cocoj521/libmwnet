@@ -60,15 +60,11 @@ public:
 	// 转换成16进制字符串
 	static std::string& BytesToHexString(const std::string& bytes, std::string& hexStr, bool upper=false); // 默认小写
 	static std::string& BytesToHexString(const char* bytes, size_t len, std::string& hexStr, bool upper=false); // 默认小写
-	static const char*  BytesToHexString(const std::string& bytes, bool upper=false); // 默认小写
-	static const char*  BytesToHexString(const char* bytes, size_t len, bool upper=false); // 默认小写
 	static bool Bin2Hex(const char* binStr, size_t binLen, std::string* hexStr);	// 固定大写
 
 	// base64编解码
 	static std::string& BytesToBase64String(const std::string& bytes, std::string& base64Str);
 	static std::string& BytesToBase64String(const char* bytes, size_t len, std::string& base64Str);
-	static const char*  BytesToBase64String(const std::string& bytes);
-	static const char*  BytesToBase64String(const char* bytes, size_t len);
 	static std::string& Base64StringToBytes(const char* base64Str, size_t len, std::string& bytes);	
 
 	// 生成MD5
@@ -76,8 +72,12 @@ public:
 	static std::string& ToMd5Bytes(const std::string& bytes, std::string& md5);
 	static std::string& ToMd5HexString(const std::string& bytes, std::string& md5HexStr, bool upper=false); // 默认小写
 	static std::string& ToMd5HexString(const char* bytes, size_t len, std::string& md5HexStr, bool upper=false); // 默认小写
-	static const char*  ToMd5HexString(const std::string& bytes, bool upper=false); // 默认小写
-	static const char*  ToMd5HexString(const char* bytes, size_t len, bool upper=false); // 默认小写
+
+	// 生成SHA256
+	static std::string& ToSha256Bytes(const char* bytes, size_t len, std::string& sha256);
+	static std::string& ToSha256Bytes(const std::string& bytes, std::string& sha256);
+	static std::string& ToSha256HexString(const std::string& bytes, std::string& sha256HexStr, bool upper=false); // 默认小写
+	static std::string& ToSha256HexString(const char* bytes, size_t len, std::string& sha256HexStr, bool upper=false); // 默认小写
 
 	// same as std::to_string
 	template<typename T>

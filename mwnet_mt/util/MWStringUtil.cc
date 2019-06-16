@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <mwnet_mt/crypto/mbedtls/base64.h>
 #include <mwnet_mt/crypto/mbedtls/md5.h>
+#include <mwnet_mt/crypto/mbedtls/sha256.h>
 
 #include "MWStringUtil.h"
 
@@ -377,24 +378,10 @@ void StrToHex(const char* src, size_t srcLen, std::string& hexStr, bool upper)
 	}
 }
 
-const char*	StringUtil::BytesToHexString(const std::string& bytes, bool upper)
-{
-	std::string dest;
-	StrToHex(bytes.data(), bytes.size(), dest, upper);
-	return dest.c_str();
-}
-
 std::string& StringUtil::BytesToHexString(const std::string& bytes, std::string& hexStr, bool upper)
 {
 	StrToHex(bytes.data(), bytes.size(), hexStr, upper); 	
 	return hexStr;
-}
-
-const char* StringUtil::BytesToHexString(const char* bytes, size_t len, bool upper)
-{
-	std::string dest;
-	StrToHex(bytes, len, dest, upper);
-	return dest.c_str();
 }
 
 std::string& StringUtil::BytesToHexString(const char* bytes, size_t len, std::string& hexStr, bool upper)
@@ -408,18 +395,6 @@ std::string& StringUtil::BytesToBase64String(const std::string& bytes, std::stri
 	return BytesToBase64String(bytes.data(), bytes.size(), base64Str);
 }
 
-const char*	 StringUtil::BytesToBase64String(const std::string& bytes)
-{
-	std::string base64Str = "";
-	BytesToBase64String(bytes.data(), bytes.size(), base64Str);
-	return base64Str.c_str();
-}
-const char*	 StringUtil::BytesToBase64String(const char* bytes, size_t len)
-{
-	std::string base64Str = "";
-	BytesToBase64String(bytes, len, base64Str);
-	return base64Str.c_str();
-}
 std::string& StringUtil::ToMd5Bytes(const std::string& bytes, std::string& md5)
 {
 	return ToMd5Bytes(bytes.data(), bytes.size(), md5);
@@ -428,15 +403,14 @@ std::string& StringUtil::ToMd5HexString(const std::string& bytes, std::string& m
 {
 	return ToMd5HexString(bytes.data(), bytes.size(), md5HexStr, upper);
 }
-const char*	StringUtil::ToMd5HexString(const std::string& bytes, bool upper)
+
+std::string& StringUtil::ToSha256Bytes(const std::string& bytes, std::string& sha256)
 {
-	std::string md5HexStr = "";
-	return ToMd5HexString(bytes.data(), bytes.size(), md5HexStr, upper).c_str();
+	return ToSha256Bytes(bytes.data(), bytes.size(), sha256);
 }
-const char*	StringUtil::ToMd5HexString(const char* bytes, size_t len, bool upper)
+std::string& StringUtil::ToSha256HexString(const std::string& bytes, std::string& sha256HexStr, bool upper)
 {
-	std::string md5HexStr = "";
-	return ToMd5HexString(bytes, len, md5HexStr, upper).c_str();
+	return ToSha256HexString(bytes.data(), bytes.size(), sha256HexStr, upper);
 }
 
 std::string StringUtil::FormatString(const char *fmt, ...)
@@ -634,6 +608,21 @@ std::string& StringUtil::ToMd5HexString(const char* bytes, size_t len, std::stri
 	ToMd5Bytes(bytes, len, md5);
 	BytesToHexString(md5.data(), md5.size(), md5HexStr, upper);
 	return md5HexStr;
+}
+
+std::string& StringUtil::ToSha256Bytes(const char* bytes, size_t len, std::string& sha256)
+{
+	sha256.clear();
+	sha256.resize(32);
+	mbedtls_sha256((const uint8_t*)bytes, len, (uint8_t*)sha256.data(), 0);
+	return sha256;
+}
+std::string& StringUtil::ToSha256HexString(const char* bytes, size_t len, std::string& sha256HexStr, bool upper)
+{
+	std::string sha256 = "";
+	ToSha256Bytes(bytes, len, sha256);
+	BytesToHexString(sha256.data(), sha256.size(), sha256HexStr, upper);
+	return sha256HexStr;
 }
 
 #pragma GCC diagnostic warning "-Wconversion"
