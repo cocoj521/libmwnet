@@ -1,5 +1,6 @@
 set(netserver_SRCS
 	NetServer.cc
+	UserOnlineList.cc
   )
 
 if(NOT CMAKE_BUILD_DYNAMIC_LIB)
