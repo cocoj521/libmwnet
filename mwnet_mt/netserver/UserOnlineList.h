@@ -140,8 +140,16 @@ public:
 	// 更新总的接收量(只增不减)
 	void UpdateTotalRecvCnt(uint64_t useruuid, uint64_t conn_uuid, const boost::any& conn, int cmd);
 
+	// 获取总接收量 connuuid填0表示所有连接，cmd填maxcmdcnt表示所有命令
+	// 返回值,满足条件的总接收量
+	size_t GetTotalRecvCnt(uint64_t useruuid, uint64_t conn_uuid, const boost::any& conn, int cmd);
+	
 	// 更新总的发收量(只增不减)
 	void UpdateTotalSendCnt(uint64_t useruuid, uint64_t conn_uuid, const boost::any& conn, int cmd);
+
+	// 获取总发送量 connuuid填0表示所有连接，cmd填maxcmdcnt表示所有命令
+	// 返回值,满足条件的总接收量
+	size_t GetTotalSendCnt(uint64_t useruuid, uint64_t conn_uuid, const boost::any& conn, int cmd);
 	
 	// 更新网络层待发送的数量（调用sendmsgwithtcpserver成功后计数inc，onsendok/onsenderr后计数dec）
 	void UpdateWaitSndCnt(uint64_t useruuid, uint64_t conn_uuid, const boost::any& conn, int cmd, enumCntOpt opt);

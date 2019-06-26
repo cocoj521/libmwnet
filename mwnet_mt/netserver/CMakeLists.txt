@@ -27,5 +27,8 @@ target_link_libraries(tcpclientlinux_test pthread)
 add_executable(netserver_test tests/netserver_test.cpp)
 target_link_libraries(netserver_test mwnet_mt_netserver mwnet_mt_util)    
 
+add_executable(cmppserver_test tests/cmppserver_test.cpp)
+target_link_libraries(cmppserver_test mwnet_mt_netserver mwnet_mt_util)  
+
 #add_executable(netserver_test2 tests/netserver_test2.cpp)
 #target_link_libraries(netserver_test2 mwnet_mt_netserver mwnet_mt_util)

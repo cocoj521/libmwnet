@@ -11,6 +11,13 @@ namespace MWNET_MT
 {
 namespace SERVER
 {
+
+#ifndef CHECK_CMD_VALUE_INVALID
+#define CHECK_CMD_VALUE_INVALID(cmd,maxcmdcnt) {\
+			(cmd<0||cmd>=maxcmdcnt)?cmd=0:1;\
+		}
+#endif
+
 UserOnlineList::UserOnlineList(int maxcmdcnt/*最多有多少个命令*/)
 	: maxcmdcnt_(maxcmdcnt)
 {
@@ -129,6 +136,8 @@ int UserOnlineList::GetBestConn(uint64_t useruuid, uint64_t& conn_uuid, boost::a
 {
 	int ret = 1;
 
+	CHECK_CMD_VALUE_INVALID(cmd, maxcmdcnt_);
+	
 	std::lock_guard<std::mutex> lock(mutex_);
 	std::map<uint64_t, UserOnlineInfoPtr>::iterator itUser = mapUserOnlineInfo_.find(useruuid);
 	if (itUser != mapUserOnlineInfo_.end())
@@ -177,6 +186,8 @@ size_t UserOnlineList::GetUserOnlineConnCnt(uint64_t useruuid)
 // 更新总的接收量(只增不减)
 void UserOnlineList::UpdateTotalRecvCnt(uint64_t useruuid, uint64_t conn_uuid, const boost::any& conn, int cmd)
 {
+	CHECK_CMD_VALUE_INVALID(cmd, maxcmdcnt_);	
+
 	MWTIMESTAMP::Timestamp tNow = MWTIMESTAMP::Timestamp::Now();
 
 	std::lock_guard<std::mutex> lock(mutex_);
@@ -198,9 +209,54 @@ void UserOnlineList::UpdateTotalRecvCnt(uint64_t useruuid, uint64_t conn_uuid, c
 	}
 }
 
+// 获取总接收量 connuuid填0表示所有连接，cmd填maxcmdcnt表示所有命令
+// 返回值,满足条件的总接收量
+size_t UserOnlineList::GetTotalRecvCnt(uint64_t useruuid, uint64_t conn_uuid, const boost::any& conn, int cmd)
+{
+	size_t cnt = 0;
+
+	CHECK_CMD_VALUE_INVALID(cmd, maxcmdcnt_);
+	
+	std::lock_guard<std::mutex> lock(mutex_);
+	std::map<uint64_t, UserOnlineInfoPtr>::iterator itUser = mapUserOnlineInfo_.find(useruuid);
+	if (itUser != mapUserOnlineInfo_.end())
+	{
+		if (0 == conn_uuid)
+		{
+			if (maxcmdcnt_ == cmd)
+			{
+				cnt = itUser->second->pUserStat_->totalrecvcnt_;
+			}
+			else
+			{
+				cnt = itUser->second->vUserCmdStat_[cmd]->totalrecvcnt_;
+			}
+		}
+		else
+		{
+			std::map<uint64_t, ConnInfoPtr>::iterator itConn = itUser->second->mapConnInfo_.find(conn_uuid);
+			if (itConn != itUser->second->mapConnInfo_.end())
+			{
+				if (maxcmdcnt_ == cmd)
+				{
+					cnt = itConn->second->pConnStat_->totalrecvcnt_;
+				}
+				else
+				{
+					cnt = itConn->second->vConnCmdStat_[cmd]->totalrecvcnt_;
+				}
+			}
+		}		
+	}
+
+	return cnt;
+}
+
 // 更新总的发收量(只增不减)
 void UserOnlineList::UpdateTotalSendCnt(uint64_t useruuid, uint64_t conn_uuid, const boost::any& conn, int cmd)
 {
+	CHECK_CMD_VALUE_INVALID(cmd, maxcmdcnt_);
+
 	std::lock_guard<std::mutex> lock(mutex_);
 	std::map<uint64_t, UserOnlineInfoPtr>::iterator itUser = mapUserOnlineInfo_.find(useruuid);
 	if (itUser != mapUserOnlineInfo_.end())
@@ -216,9 +272,54 @@ void UserOnlineList::UpdateTotalSendCnt(uint64_t useruuid, uint64_t conn_uuid, c
 	}
 }
 
+// 获取总发送量 connuuid填0表示所有连接，cmd填maxcmdcnt表示所有命令
+// 返回值,满足条件的总接收量
+size_t UserOnlineList::GetTotalSendCnt(uint64_t useruuid, uint64_t conn_uuid, const boost::any& conn, int cmd)
+{
+	size_t cnt = 0;
+	
+	CHECK_CMD_VALUE_INVALID(cmd, maxcmdcnt_);
+	
+	std::lock_guard<std::mutex> lock(mutex_);
+	std::map<uint64_t, UserOnlineInfoPtr>::iterator itUser = mapUserOnlineInfo_.find(useruuid);
+	if (itUser != mapUserOnlineInfo_.end())
+	{
+		if (0 == conn_uuid)
+		{
+			if (maxcmdcnt_ == cmd)
+			{
+				cnt = itUser->second->pUserStat_->totalsendcnt_;
+			}
+			else
+			{
+				cnt = itUser->second->vUserCmdStat_[cmd]->totalsendcnt_;
+			}
+		}
+		else
+		{
+			std::map<uint64_t, ConnInfoPtr>::iterator itConn = itUser->second->mapConnInfo_.find(conn_uuid);
+			if (itConn != itUser->second->mapConnInfo_.end())
+			{
+				if (maxcmdcnt_ == cmd)
+				{
+					cnt = itConn->second->pConnStat_->totalsendcnt_;
+				}
+				else
+				{
+					cnt = itConn->second->vConnCmdStat_[cmd]->totalsendcnt_;
+				}
+			}
+		}		
+	}
+
+	return cnt;
+}
+
 // 更新网络层待发送的数量（调用sendmsgwithtcpserver成功后计数inc，onsendok/onsenderr后计数dec）
 void UserOnlineList::UpdateWaitSndCnt(uint64_t useruuid, uint64_t conn_uuid, const boost::any& conn, int cmd, enumCntOpt opt)
 {
+	CHECK_CMD_VALUE_INVALID(cmd, maxcmdcnt_);
+
 	std::lock_guard<std::mutex> lock(mutex_);
 	std::map<uint64_t, UserOnlineInfoPtr>::iterator itUser = mapUserOnlineInfo_.find(useruuid);
 	if (itUser != mapUserOnlineInfo_.end())
@@ -239,6 +340,8 @@ void UserOnlineList::UpdateWaitSndCnt(uint64_t useruuid, uint64_t conn_uuid, con
 size_t UserOnlineList::GetWaitSndCnt(uint64_t useruuid, uint64_t conn_uuid, const boost::any& conn, int cmd)
 {
 	size_t cnt = 0;
+	
+	CHECK_CMD_VALUE_INVALID(cmd, maxcmdcnt_);
 
 	std::lock_guard<std::mutex> lock(mutex_);
 	std::map<uint64_t, UserOnlineInfoPtr>::iterator itUser = mapUserOnlineInfo_.find(useruuid);
@@ -246,7 +349,14 @@ size_t UserOnlineList::GetWaitSndCnt(uint64_t useruuid, uint64_t conn_uuid, cons
 	{
 		if (0 == conn_uuid)
 		{
-			cnt = itUser->second->pUserStat_->waitsndcnt_;
+			if (maxcmdcnt_ == cmd)
+			{
+				cnt = itUser->second->pUserStat_->waitsndcnt_;
+			}
+			else
+			{
+				cnt = itUser->second->vUserCmdStat_[cmd]->waitsndcnt_;
+			}
 		}
 		else
 		{
@@ -271,6 +381,8 @@ size_t UserOnlineList::GetWaitSndCnt(uint64_t useruuid, uint64_t conn_uuid, cons
 // 更新业务数据待回应的数量（onsendok返回后计数inc，onrecvmsg返回后计数dec）
 void UserOnlineList::UpdateWaitRspCnt(uint64_t useruuid, uint64_t conn_uuid, const boost::any& conn, int cmd, enumCntOpt opt)
 {
+	CHECK_CMD_VALUE_INVALID(cmd, maxcmdcnt_);
+
 	std::lock_guard<std::mutex> lock(mutex_);
 	std::map<uint64_t, UserOnlineInfoPtr>::iterator itUser = mapUserOnlineInfo_.find(useruuid);
 	if (itUser != mapUserOnlineInfo_.end())
@@ -292,13 +404,22 @@ size_t UserOnlineList::GetWaitRspCnt(uint64_t useruuid, uint64_t conn_uuid, cons
 {
 	size_t cnt = 0;
 
+	CHECK_CMD_VALUE_INVALID(cmd, maxcmdcnt_);
+
 	std::lock_guard<std::mutex> lock(mutex_);
 	std::map<uint64_t, UserOnlineInfoPtr>::iterator itUser = mapUserOnlineInfo_.find(useruuid);
 	if (itUser != mapUserOnlineInfo_.end())
 	{
 		if (0 == conn_uuid)
 		{
-			cnt = itUser->second->pUserStat_->waitrspcnt_;
+			if (maxcmdcnt_ == cmd)
+			{
+				cnt = itUser->second->pUserStat_->waitrspcnt_;
+			}
+			else
+			{
+				cnt = itUser->second->vUserCmdStat_[cmd]->waitrspcnt_;
+			}
 		}
 		else
 		{
@@ -323,6 +444,8 @@ size_t UserOnlineList::GetWaitRspCnt(uint64_t useruuid, uint64_t conn_uuid, cons
 // 更新已占用窗口计数（调用sendmsgwithtcpserver之前inc,若调用后败再dec,若调用成功,等待回调,onsenderr回调/onrecvmsg回调时dec）
 void UserOnlineList::UpdateSlideWndCnt(uint64_t useruuid, uint64_t conn_uuid, const boost::any& conn, int cmd, enumCntOpt opt)
 {
+	CHECK_CMD_VALUE_INVALID(cmd, maxcmdcnt_);
+
 	std::lock_guard<std::mutex> lock(mutex_);
 	std::map<uint64_t, UserOnlineInfoPtr>::iterator itUser = mapUserOnlineInfo_.find(useruuid);
 	if (itUser != mapUserOnlineInfo_.end())
@@ -351,6 +474,8 @@ void UserOnlineList::UpdateSlideWndCnt(uint64_t useruuid, uint64_t conn_uuid, co
 size_t UserOnlineList::GetSlideWndCnt(uint64_t useruuid, uint64_t conn_uuid, const boost::any& conn, int cmd)
 {
 	size_t cnt = 0;
+	
+	CHECK_CMD_VALUE_INVALID(cmd, maxcmdcnt_);
 
 	std::lock_guard<std::mutex> lock(mutex_);
 	std::map<uint64_t, UserOnlineInfoPtr>::iterator itUser = mapUserOnlineInfo_.find(useruuid);
@@ -358,7 +483,14 @@ size_t UserOnlineList::GetSlideWndCnt(uint64_t useruuid, uint64_t conn_uuid, con
 	{
 		if (0 == conn_uuid)
 		{
-			cnt = itUser->second->pUserStat_->slidewndcnt_;
+			if (maxcmdcnt_ == cmd)
+			{
+				cnt = itUser->second->pUserStat_->slidewndcnt_;
+			}
+			else
+			{
+				cnt = itUser->second->vUserCmdStat_[cmd]->slidewndcnt_;
+			}
 		}
 		else
 		{

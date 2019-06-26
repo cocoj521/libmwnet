@@ -242,6 +242,10 @@ private:
 	typedef int (*pfunc_on_highwatermark)(void* pInvoker, const uint64_t conn_uuid, const boost::any& conn, const boost::any& sessioninfo, size_t highWaterMark);
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+//关于是否开启端口复用:
+//短连接较多的情况建议启用端口复用,这样可以提高短连接建连能力
+//长连接较多的不建议启用,因为启用后连接分配由系统完成,无法确保每个IO线程上连接的平均性
+
 class NetServer
 	{
 	static const size_t kDefRecvBuf_httpsvr = 4  * 1024;
