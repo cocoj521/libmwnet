@@ -410,6 +410,7 @@ int deal_cmpp_mt(void* pInvoker, uint64_t conn_uuid, const boost::any& conn, con
     pos     = (unsigned int*)(szRsp + 8);
     *pos    = htonl(nSeqId);
 
+	//m_pCmppServer->SuspendTcpConnRecv(conn_uuid, conn, 3000);
 	boost::any params;
 	m_pCmppServer->SendMsgWithTcpServer(conn_uuid, conn, params, (const char*)szRsp, nLen);
 	m_pUserOnlineList->UpdateTotalSendCnt(10001, conn_uuid, conn, SUBMIT_RSP);

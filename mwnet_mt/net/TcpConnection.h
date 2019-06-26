@@ -97,6 +97,8 @@ class TcpConnection : noncopyable,
   void forceClose();
   void forceCloseWithDelay(double seconds);
   void setTcpNoDelay(bool on);
+  void suspendRecv(int delay);
+  void resumeRecv();
   // reading or not
   void startRead();
   void stopRead();
@@ -194,6 +196,8 @@ class TcpConnection : noncopyable,
   const char* stateToString() const;
   void startReadInLoop();
   void stopReadInLoop();
+  void suspendRecvInLoop(int delay);
+  void resumeRecvInLoop();
   // 将所有未发的数据失败回调
   void callbackAllNoSendOutputBuffer();
   // 发送超时回调
@@ -229,6 +233,7 @@ private:
   boost::any context_;
   boost::any exinfo_;
   boost::any session_;	//store shared_ptr will be better
+  TimerId suspendReadTimer_;
   // FIXME: creationTime_, lastReceiveTime_
   //        bytesReceived_, bytesSent_
 };

@@ -300,6 +300,17 @@ class NetServer
 		//0:成功    1:当前连接已不可用          2:当前连接最大发送缓冲已满
 		int 	SendMsgWithTcpServer(uint64_t conn_uuid, const boost::any& conn, const boost::any& params, const char* szMsg, size_t nMsgLen, int timeout=0, bool bKeepAlive=true);
 
+		//暂停当前TCP连接的数据接收
+		//conn_uuid:连接建立时返回的连接惟一ID
+		//conn:连接建立时返回的连接对象
+		//delay:暂停接收的时长.单位:毫秒,默认为10ms,<=0时不延时
+		void 	SuspendTcpConnRecv(uint64_t conn_uuid, const boost::any& conn, int delay);
+
+		//恢复当前TCP连接的数据接收
+		//conn_uuid:连接建立时返回的连接惟一ID
+		//conn:连接建立时返回的连接对象
+		void 	ResumeTcpConnRecv(uint64_t conn_uuid, const boost::any& conn);
+
 		//强制关闭TCP连接
 		void 	ForceCloseTcpConnection(uint64_t conn_uuid, const boost::any& conn);
 

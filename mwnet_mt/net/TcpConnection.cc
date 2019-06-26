@@ -342,6 +342,34 @@ const char* TcpConnection::stateToString() const
 	}
 }
 
+void TcpConnection::suspendRecvInLoop(int delay)
+{
+	// 暂停读事件
+	stopRead();
+	// 先取消旧的timer
+	loop_->cancel(suspendReadTimer_);
+	// 再创建新的timer,timer到期后再打开读事件
+	suspendReadTimer_ = loop_->runAfter(static_cast<int>(delay)/1000.0, 
+				std::bind(&TcpConnection::startRead, shared_from_this()));
+}
+void TcpConnection::resumeRecvInLoop()
+{
+	// 取消旧的timer
+	loop_->cancel(suspendReadTimer_);
+	// 打开读事件
+	startRead();
+}
+//暂停当前TCP连接的数据接收
+void TcpConnection::suspendRecv(int delay)
+{
+	loop_->runInLoop(std::bind(&TcpConnection::suspendRecvInLoop, shared_from_this(), delay));
+}
+//恢复当前TCP连接的数据接收
+void TcpConnection::resumeRecv()
+{
+	loop_->runInLoop(std::bind(&TcpConnection::resumeRecvInLoop, shared_from_this()));
+}
+
 void TcpConnection::setTcpNoDelay(bool on)
 {
 	socket_->setTcpNoDelay(on);

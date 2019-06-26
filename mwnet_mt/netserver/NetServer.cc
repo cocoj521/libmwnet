@@ -360,7 +360,16 @@ public:
 		//conn->forceCloseWithDelay(1.0);  // > round trip of the whole Internet.
 		conn->forceClose();
 	}
-	
+	//暂停当前TCP连接的数据接收
+	void SuspendConnRecv(const TcpConnectionPtr& conn, int delay)
+	{
+		conn->suspendRecv(delay);
+	}
+	//恢复当前TCP连接的数据接收
+	void ResumeConnRecv(const TcpConnectionPtr& conn)
+	{
+		conn->resumeRecv();
+	}
 	// 设置tcp会话的信息(请传session类的智能指针，并且只允许调用一次&session类中自行控制多线程互斥问题)
 	void SetTcpSessionInfo(const TcpConnectionPtr& conn, const boost::any& sessioninfo)
 	{
@@ -1964,6 +1973,68 @@ public:
 			}
 		}
 	}
+	//暂停当前TCP连接的数据接收
+	void SuspendTcpConnRecv(uint64_t conn_uuid, const boost::any& conn, int delay)
+	{
+		net_ctrl_params_ptr pCtrlParams = m_ptrCtrlParams;
+		if (pCtrlParams && !pCtrlParams->g_bExit_tcp) 
+		{
+			WeakTcpConnectionPtr weakconn;
+			if (pCtrlParams->g_unique_node_id >= 1 && pCtrlParams->g_unique_node_id <= 8000)
+			{
+				MutexLockGuard lock(pCtrlParams->g_mapTcpConns_lock);
+				std::map<uint64_t, WeakTcpConnectionPtr>::iterator it = pCtrlParams->g_mapTcpConns.find(conn_uuid);
+				if (it != pCtrlParams->g_mapTcpConns.end())
+				{
+					weakconn = it->second;
+				}
+			}
+			else
+			{
+				if (!conn.empty()) weakconn = boost::any_cast<WeakTcpConnectionPtr>(conn);
+			}
+			TcpConnectionPtr pConn(weakconn.lock());
+			if (pConn && !pConn->getContext().empty())
+			{
+				ConnNodePtr node(boost::any_cast<ConnNodePtr>(pConn->getContext()));
+				if (node)
+				{
+					m_TcpNetServerImpls[node->GetIndex()]->SuspendConnRecv(pConn, delay);
+				}
+			}
+		}
+	}
+	//恢复当前TCP连接的数据接收
+	void ResumeTcpConnRecv(uint64_t conn_uuid, const boost::any& conn)
+	{
+		net_ctrl_params_ptr pCtrlParams = m_ptrCtrlParams;
+		if (pCtrlParams && !pCtrlParams->g_bExit_tcp) 
+		{
+			WeakTcpConnectionPtr weakconn;
+			if (pCtrlParams->g_unique_node_id >= 1 && pCtrlParams->g_unique_node_id <= 8000)
+			{
+				MutexLockGuard lock(pCtrlParams->g_mapTcpConns_lock);
+				std::map<uint64_t, WeakTcpConnectionPtr>::iterator it = pCtrlParams->g_mapTcpConns.find(conn_uuid);
+				if (it != pCtrlParams->g_mapTcpConns.end())
+				{
+					weakconn = it->second;
+				}
+			}
+			else
+			{
+				if (!conn.empty()) weakconn = boost::any_cast<WeakTcpConnectionPtr>(conn);
+			}
+			TcpConnectionPtr pConn(weakconn.lock());
+			if (pConn && !pConn->getContext().empty())
+			{
+				ConnNodePtr node(boost::any_cast<ConnNodePtr>(pConn->getContext()));
+				if (node)
+				{
+					m_TcpNetServerImpls[node->GetIndex()]->ResumeConnRecv(pConn);
+				}
+			}
+		}
+	}
 	// 重置TCP空连接踢空时间
 	void ResetTcpIdleConnTime(int idleconntime)
 	{
@@ -2493,6 +2564,16 @@ int NetServer::SendMsgWithTcpServer(uint64_t conn_uuid, const boost::any& conn, 
 void NetServer::ForceCloseTcpConnection(uint64_t conn_uuid, const boost::any& conn)
 {
 	if (m_NetServerCtrl) m_NetServerCtrl->ForceCloseTcpConnection(conn_uuid, conn);
+}
+//暂停当前TCP连接的数据接收
+void NetServer::SuspendTcpConnRecv(uint64_t conn_uuid, const boost::any& conn, int delay)
+{
+	if (m_NetServerCtrl) m_NetServerCtrl->SuspendTcpConnRecv(conn_uuid, conn, delay);
+}
+//恢复当前TCP连接的数据接收
+void  NetServer::ResumeTcpConnRecv(uint64_t conn_uuid, const boost::any& conn)
+{
+	if (m_NetServerCtrl) m_NetServerCtrl->ResumeTcpConnRecv(conn_uuid, conn);
 }
 // 重置TCP空连接踢空时间
 void NetServer::ResetTcpIdleConnTime(int idleconntime)
