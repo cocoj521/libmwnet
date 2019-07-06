@@ -21,13 +21,13 @@ target_link_libraries(mwnet_mt_curl mwnet_mt_netbase mwnet_mt_base curl ssl cryp
 install(TARGETS mwnet_mt_curl DESTINATION lib)
 
 set(HEADERS
-	CurlRequest.h
-	CurlManager.h
-	CurlEvMgr.h
-	RequestManager.h
+#	CurlRequest.h
+#	CurlManager.h
+#	CurlEvMgr.h
+#	RequestManager.h
 	CurlHttpClient.h
   )
-install(FILES ${HEADERS} DESTINATION include/mwnet_mt/curl)
+install(FILES ${HEADERS} DESTINATION include/mwnet_mt/netclient)
 
 add_executable(jhb_curl_test tests/curl_test.cpp)
 target_link_libraries(jhb_curl_test mwnet_mt_curl mwnet_mt_base mwnet_mt_netbase pthread rt)
