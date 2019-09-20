@@ -553,7 +553,7 @@ void TcpConnection::handleWrite()
 // 将所有未发的数据失败回调
 void TcpConnection::callbackAllNoSendOutputBuffer()
 {
-	return;
+	//return;
 	//将未发完的数据回调失败
 	OUTBUFFER_LIST_IT it = outputBufferList_.begin();
 	for (;it != outputBufferList_.end();)
