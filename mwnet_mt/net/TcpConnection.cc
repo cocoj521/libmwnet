@@ -126,7 +126,7 @@ int TcpConnection::send(const StringPiece& message, const boost::any& params, in
 			void (TcpConnection::*fp)(const StringPiece& message, const boost::any& params, int timeout) = &TcpConnection::sendInLoop;
 			loop_->runInLoop(
 				  			std::bind(fp,
-				            this,     // FIXME
+				            shared_from_this(),     // FIXME
 				            message.as_string(),
 				            params,
 				            timeout));
@@ -162,7 +162,7 @@ int TcpConnection::send(Buffer* buf, const boost::any& params, int timeout)
 			void (TcpConnection::*fp)(const StringPiece& message, const boost::any& params, int timeout) = &TcpConnection::sendInLoop;
 			loop_->runInLoop(
 							std::bind(fp,
-							this,     // FIXME
+							shared_from_this(),     // FIXME
 							buf->retrieveAllAsString(),
 							params,
 							timeout));
