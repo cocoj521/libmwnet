@@ -648,11 +648,12 @@ int main(int argc, char* argv[])
 		static int64_t last_http_cnt = 0;
 		static time_t tStart = time(NULL);
 		sleep(1);
+		size_t total_sd_cnt = m_pUserOnlineList->GetTotalSendCnt(10001, 0, nullptr, SUBMIT_RSP);
 		printf("cmppserver  --- totallink:%d-totalreq:%ld-spd:%ld-waitsend:%ld\n", 
 			m_pCmppServer->GetCurrTcpConnNum(),
-			m_pCmppServer->GetTotalTcpReqNum(),
-			m_pCmppServer->GetTotalTcpReqNum()-last_tcp_cnt,
+			total_sd_cnt,
+			total_sd_cnt-last_tcp_cnt,
 			m_pCmppServer->GetTotalTcpWaitSendNum());
-		last_tcp_cnt = m_pCmppServer->GetTotalTcpReqNum();
+		last_tcp_cnt = total_sd_cnt;
 	}
 }
