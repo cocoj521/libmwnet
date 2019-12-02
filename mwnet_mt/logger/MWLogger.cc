@@ -134,7 +134,7 @@ LogStream& LogStream::Format(const char * _Format, ...)
 			char* pStr = static_cast<char*>(alloca(needed+1));
 
 			va_start(arg_list, _Format);
-			vsnprintf(pStr, needed, _Format, arg_list);
+			vsnprintf(pStr, needed+1, _Format, arg_list);
 			va_end(arg_list);
 
 			m_LogStrPtr->append(pStr, needed);
