@@ -106,7 +106,9 @@ public:
 	static void Exit();
 private:
 	boost::any m_any;
+	//输出方式
 	OUTPUT_TYPE m_optype;
+	//日志文件编号
 	int m_x;
 };
 

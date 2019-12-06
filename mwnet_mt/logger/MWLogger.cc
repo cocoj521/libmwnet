@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/prctl.h>
 #include <stdarg.h>
 #include <time.h>
 #include <stdio.h>
@@ -519,6 +520,8 @@ private:
 	//处理日志
 	static void ThreadForDealFileJob(void *p)
 	{
+		prctl(PR_SET_NAME, "LogAutoClean");
+		
 		DealLogFile *pThis = static_cast<DealLogFile *>(p);
 
 		while (!pThis->m_bExit)
@@ -527,7 +530,6 @@ private:
 
 			// 休眠5秒
 			sleep(5);
-
 		}
 	}
 
@@ -794,7 +796,7 @@ bool Logger::CreateLogObjs(const std::string& basepath, const std::string& based
 		}
 	}
 
-	std::string strBakPath = basepath + basedir + "BakLog/";
+	std::string strBakPath = basepath + basedir + "baklog/";
 	std::string strBasePath = basepath + basedir;
 	mkdir(strBakPath.c_str(), 0755);
 
