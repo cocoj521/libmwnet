@@ -415,6 +415,7 @@ std::string& StringUtil::ToSha256HexString(const std::string& bytes, std::string
 
 std::string StringUtil::FormatString(const char *fmt, ...)
 {
+	/*
 	{
 		const int nReserved = 512;
 		std::string strRet(nReserved, '\0');
@@ -453,10 +454,30 @@ FMT1:
 		}
 		return strRet;
 	}
+	*/
+	va_list marker;
+	va_start(marker, fmt);
+	int nNeeded = vsnprintf(NULL, 0, fmt, marker);
+	va_end(marker);
+	if (nNeeded < 0) return "";
+	va_start(marker, fmt);
+	std::string strRet(nNeeded, '\0');
+	int nSize = vsnprintf(const_cast<char* >(strRet.data()), nNeeded+1, fmt, marker);
+	va_end(marker);
+	if (nSize > 0 && nSize <= nNeeded)
+	{
+		strRet.resize(nSize);
+	}
+	else
+	{
+		strRet = "";
+	}
+	return strRet;
 }
 
 std::string& StringUtil::FormatString(std::string& str, const char *fmt, ...)
 {
+	/*
 	{
 		const int nReserved = 512;
 		str.resize(nReserved);
@@ -499,6 +520,29 @@ FMT1:
 		}
 		return str;
 	}
+	*/
+	va_list marker;
+	va_start(marker, fmt);
+	int nNeeded = vsnprintf(NULL, 0, fmt, marker);
+	va_end(marker);
+	if (nNeeded <= 0) 
+	{
+		str = "";
+		return str;
+	}
+	va_start(marker, fmt);
+	str.resize(nNeeded);
+	int nSize = vsnprintf(const_cast<char* >(str.data()), nNeeded+1, fmt, marker);
+	va_end(marker);
+	if (nSize > 0 && nSize <= nNeeded)
+	{
+		str.resize(nSize);
+	}
+	else
+	{
+		str = "";
+	}
+	return str;
 }
 
 #pragma GCC diagnostic ignored "-Wconversion"
