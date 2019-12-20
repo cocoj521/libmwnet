@@ -550,6 +550,51 @@ private:
 					mkdir(createDir.c_str(), 0755);
 				}
 
+				//压缩目录中前N天的日志到指定目录
+				std::string zipfile = "find " + m_strBasePath + it + " -mtime +" + std::to_string(m_nZipDay) + " -name \"*.log\" -exec zip -r " + strZipFile + " {} \\; ";  
+				
+				//删除目录中前N天的日志文	
+				std::string delfile = "find " + m_strBasePath + it + " -mtime +" + std::to_string(m_nZipDay) + " -name \"*.log\" | xargs rm {} -rf \\; "; 
+				
+				//删除目录中空文件夹	
+				std::string delemptyfile = "if [ \"`find " + m_strBasePath + it + " -name \"*\" -type d -empty`\" != \"" + m_strBasePath + it + "\" ]; then find " + m_strBasePath + it + " -type d -empty | xargs rm -rf {}; fi ";		
+				
+				//删除备份目录中前N的压缩文件
+				std::string bakfile = "find " + m_strBakPath + it + " -mtime +" + std::to_string(m_nSaveDay) + " -name \"*.zip\" | xargs rm {} -rf \\; ";
+				
+				//删除备份目录中的空文件夹
+				std::string delbakemptyfile = "find " + m_strBakPath + it + " -name \"*\" -type d -empty | xargs  rm -rf \\; ";
+						
+																				   
+				//执行任务
+				system(zipfile.c_str());
+				system(delfile.c_str());
+				system(delemptyfile.c_str());
+				system(bakfile.c_str());
+				system(delbakemptyfile.c_str());
+			}
+		}
+
+		return true;
+	}
+/*
+	bool DoJob()
+	{
+		if (IsCrossDay())
+		{
+			for (auto it : m_vFileNames)
+			{
+				std::string strZipFile = GetZipFileName(m_strBakPath + it + "/", it);
+
+				//创建对应目录
+				std::string createDir;
+				std::size_t pos = strZipFile.find_last_of('/');
+				if (pos != std::string::npos)
+				{
+					createDir = strZipFile.substr(0, pos);
+					mkdir(createDir.c_str(), 0755);
+				}
+
 				std::string str = "find " + m_strBasePath + it + " -mtime +" + std::to_string(m_nZipDay) + " -name \"*.log\" -exec zip -r " + strZipFile + " {} \\; "  //压缩目录中前N天的日志到指定目录
 					"&& find " + m_strBasePath + it + " -mtime +" + std::to_string(m_nZipDay) + " -name \"*.log\" -exec rm {} -rf \\; "								   //删除目录中前N天的日志文件
 					"&& find " + m_strBasePath + it + " -name \"*\" -type d -empty | xargs  rm -rf \\; "															   //删除目录中空文件夹						
@@ -563,7 +608,7 @@ private:
 
 		return true;
 	}
-
+*/
 	// 是否跨天
 	static bool IsCrossDay()
 	{
