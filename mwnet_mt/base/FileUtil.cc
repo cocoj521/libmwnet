@@ -18,12 +18,22 @@ FileUtil::AppendFile::AppendFile(StringArg filename)
 {
   assert(fp_);
   ::setbuffer(fp_, buffer_, sizeof buffer_);
+  /*
+  //执行该命令可以防止正在写入的文件被删掉,但是如果程序突然挂了,这个文件就后续程序就删不掉了
+  strFilename = filename.c_str();
+  std::string strChattr = "sudo chattr +a " + strFilename;
+  system(strChattr.c_str());
+  */
   // posix_fadvise POSIX_FADV_DONTNEED ?
 }
 
 FileUtil::AppendFile::~AppendFile()
 {
   ::fclose(fp_);
+  /*
+  std::string strChattr = "sudo chattr -a " + strFilename;
+  system(strChattr.c_str());
+  */
 }
 
 void FileUtil::AppendFile::append(const char* logline, const size_t len)
