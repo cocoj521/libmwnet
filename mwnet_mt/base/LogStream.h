@@ -5,9 +5,7 @@
 #include <mwnet_mt/base/Types.h>
 #include <assert.h>
 #include <string.h> // memcpy
-#ifndef MWNET_MT_STD_STRING
-#include <string>
-#endif
+#include <memory>
 
 namespace mwnet_mt
 {
@@ -15,8 +13,8 @@ namespace mwnet_mt
 namespace detail
 {
 
-const int kSmallBuffer = 4000;
-const int kLargeBuffer = 4000*1000;
+const int kSmallBuffer = 16*1024;
+const int kLargeBuffer = 4*1024*1024;
 
 template<int SIZE>
 class FixedBuffer : noncopyable
@@ -79,11 +77,15 @@ class LogStream : noncopyable
   typedef LogStream self;
  public:
   typedef detail::FixedBuffer<detail::kSmallBuffer> Buffer;
-
+  LogStream()
+  {
+	  p_buffer_.reset(new string());
+	  p_buffer_->reserve(detail::kSmallBuffer);
+  }
   self& operator<<(bool v)
   {
-    buffer_.append(v ? "1" : "0", 1);
-    return *this;
+	  p_buffer_->append(v ? "1" : "0", 1);
+	  return *this;
   }
 
   self& operator<<(short);
@@ -107,8 +109,8 @@ class LogStream : noncopyable
 
   self& operator<<(char v)
   {
-    buffer_.append(&v, 1);
-    return *this;
+	  p_buffer_->append(&v, 1);
+	  return *this;
   }
 
   // self& operator<<(signed char);
@@ -118,11 +120,11 @@ class LogStream : noncopyable
   {
     if (str)
     {
-      buffer_.append(str, strlen(str));
+		p_buffer_->append(str, strlen(str));
     }
     else
     {
-      buffer_.append("(null)", 6);
+		p_buffer_->append("(null)", 6);
     }
     return *this;
   }
@@ -134,22 +136,14 @@ class LogStream : noncopyable
 
   self& operator<<(const string& v)
   {
-    buffer_.append(v.c_str(), v.size());
-    return *this;
+	  p_buffer_->append(v.c_str(), v.size());
+	  return *this;
   }
-
-#ifndef MWNET_MT_STD_STRING
-  self& operator<<(const std::string& v)
-  {
-    buffer_.append(v.c_str(), v.size());
-    return *this;
-  }
-#endif
 
   self& operator<<(const StringPiece& v)
   {
-    buffer_.append(v.data(), v.size());
-    return *this;
+	  p_buffer_->append(v.data(), v.size());
+	  return *this;
   }
 
   self& operator<<(const Buffer& v)
@@ -158,9 +152,9 @@ class LogStream : noncopyable
     return *this;
   }
 
-  void append(const char* data, int len) { buffer_.append(data, len); }
-  const Buffer& buffer() const { return buffer_; }
-  void resetBuffer() { buffer_.reset(); }
+  void append(const char* data, int len) { p_buffer_->append(data, len); }
+  const std::shared_ptr<string>& buffer() const { return p_buffer_; }
+  void resetBuffer() { p_buffer_->resize(0); }
 
  private:
   void staticCheck();
@@ -168,7 +162,7 @@ class LogStream : noncopyable
   template<typename T>
   void formatInteger(T);
 
-  Buffer buffer_;
+  std::shared_ptr<string> p_buffer_;
 
   static const int kMaxNumericSize = 32;
 };

@@ -18,8 +18,10 @@ namespace MWNET_MT
 namespace CLIENT
 {
 	AtomicInt64 g_nSequnceId;
-	uint64_t MakeConnuuid(uint16_t unique_node_id, AtomicInt64& nSequnceId)
+	//生成雪花,1年内不重复
+	uint64_t MakeSnowId(uint16_t unique_node_id, AtomicInt64& nSequnceId)
 	{
+		unsigned int sign = 0;
 		unsigned int nYear = 0;
 		unsigned int nMonth = 0;
 		unsigned int nDay = 0;
@@ -27,35 +29,31 @@ namespace CLIENT
 		unsigned int nMin = 0;
 		unsigned int nSec = 0;
 		unsigned int nNodeid = unique_node_id;
-		unsigned int nNo = static_cast<unsigned int>(nSequnceId.getAndAdd(1) % (0x03ffff));
-	
+		unsigned int nNo = static_cast<unsigned int>(nSequnceId.getAndAdd(1) % (0xFFFFFF));
+
 		struct timeval tv;
 		struct tm	   tm_time;
 		gettimeofday(&tv, NULL);
 		localtime_r(&tv.tv_sec, &tm_time);
-	
-	/*
-		time_t t = time(NULL);
-		struct tm tm_time = *localtime(&t);
-	*/
-		nYear = tm_time.tm_year+1900;
-		nYear = nYear%100;
-		nMonth = tm_time.tm_mon+1;
+
+		nYear = tm_time.tm_year + 1900;
+		nYear = nYear % 100;
+		nMonth = tm_time.tm_mon + 1;
 		nDay = tm_time.tm_mday;
 		nHour = tm_time.tm_hour;
 		nMin = tm_time.tm_min;
 		nSec = tm_time.tm_sec;
-	
+
 		int64_t j = 0;
-		j |= static_cast<int64_t>(nYear& 0x7f) << 57;	//year 0~99
-		j |= static_cast<int64_t>(nMonth & 0x0f) << 53;//month 1~12
-		j |= static_cast<int64_t>(nDay & 0x1f) << 48;//day 1~31
-		j |= static_cast<int64_t>(nHour & 0x1f) << 43;//hour 0~24
-		j |= static_cast<int64_t>(nMin & 0x3f) << 37;//min 0~59
-		j |= static_cast<int64_t>(nSec & 0x3f) << 31;//second 0~59
-		j |= static_cast<int64_t>(nNodeid & 0x01fff) << 18;//nodeid 1~8000
-		j |= static_cast<int64_t>(nNo & 0x03ffff);	//seqid,0~0x03ffff
-	
+		j |= static_cast<int64_t>(sign) << 63;   //符号位 0
+		j |= static_cast<int64_t>(nMonth & 0x0f) << 59;//month 1~12
+		j |= static_cast<int64_t>(nDay & 0x1f) << 54;//day 1~31
+		j |= static_cast<int64_t>(nHour & 0x1f) << 49;//hour 0~24
+		j |= static_cast<int64_t>(nMin & 0x3f) << 43;//min 0~59
+		j |= static_cast<int64_t>(nSec & 0x3f) << 37;//second 0~59
+		j |= static_cast<int64_t>(nNodeid & 0x01fff) << 24;//nodeid 1~8000
+		j |= static_cast<int64_t>(nNo & 0xFFFFFF);	//seqid,0~0xFFFFFF
+
 		return j;
 	}
 	void xdef_onConnection(const TcpConnectionPtr& conn)
@@ -108,7 +106,7 @@ namespace CLIENT
 			client_.setConnectionCallback(std::bind(&xTcpClient::onConnection, this, _1));
 			//client_.setConnectionCallback(xdef_onConnection);
 
-			client_.setMessageCallback(std::bind(&xTcpClient::onMessage, this, _1, _2, _3));
+			client_.setMessageCallback(std::bind(&xTcpClient::onMessage, this, _1, _2, _3, std::placeholders::_4));
 			client_.setWriteCompleteCallback(std::bind(&xTcpClient::onWriteOk, this, _1, _2));
 		}
 
@@ -188,7 +186,7 @@ namespace CLIENT
 				weak_conn_ = conn;
 				conn_status_ = true;
 				
-				uint64_t conn_uuid = MakeConnuuid(0, g_nSequnceId);
+				uint64_t conn_uuid = MakeSnowId(0, g_nSequnceId);
 				conn->setConnuuid(conn_uuid);
 				
 				conn->setHighWaterMarkCallback(std::bind(&xTcpClient::onHighWater, shared_from_this(), _1, _2), highWaterMark_);
@@ -228,10 +226,17 @@ namespace CLIENT
 
 		}
 
-		void onMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time)
+		void onMessage(const TcpConnectionPtr& conn, Buffer* buf, size_t len, Timestamp time)
 		{
 			if (!conn) return;
-						
+
+			//write logs tcpclient还没集成日志库,暂不生成日志
+			/*
+			LOG_INFO << "[HTTP][RECV]["
+				<< conn->getConnuuid() << "]["
+				<< conn->peerAddress().toIpPort() << "]:"
+				<< StringUtil::BytesToHexString(buf->reverse_peek(len), len);
+			*/
 			if (m_pfunc_on_readmsg_tcp)
 			{
 				int nReadedLen = 0;

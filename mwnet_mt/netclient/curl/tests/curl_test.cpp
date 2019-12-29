@@ -111,7 +111,7 @@ typedef std::shared_ptr<mwnet_mt::ThreadPool> ThreadPoolPtr;
 //..........................................................
 std::unique_ptr<mwnet_mt::LogFile> g_logFile;
 
-void outputFunc(const char* msg, int len)
+void outputFunc(const char* msg, size_t len)
 {
   g_logFile->append(msg, len);
 }

@@ -1,6 +1,5 @@
 #include <mwnet_mt/base/CurrentThread.h>
 #include <mwnet_mt/base/TimeZone.h>
-#include <mwnet_mt/base/LogStream.h>
 #include <mwnet_mt/base/Timestamp.h>
 #include <mwnet_mt/base/StringPiece.h>
 #include <mwnet_mt/base/Types.h>
@@ -147,7 +146,7 @@ LogStream& LogStream::Format(const char * _Format, ...)
 template<typename T>
 void LogStream::formatInteger(T v)
 {
-	char buf[kMaxNumericSize] = {0};
+	char buf[kMaxNumericSize+1] = {0};
 	size_t len = TMPUTIL::convert(buf, v);
 	if (m_LogStrPtr) m_LogStrPtr->append(buf, len);
 }
@@ -260,7 +259,7 @@ LogStream& LogStream::operator<<(unsigned long long v)
 LogStream& LogStream::operator<<(const void* p)
 {
 	uintptr_t v = reinterpret_cast<uintptr_t>(p);
-	char buf[kMaxNumericSize] = {0};
+	char buf[kMaxNumericSize+1] = {0};
 	buf[0] = '0';
 	buf[1] = 'x';
 	size_t len = TMPUTIL::convertHex(buf+2, v);
@@ -272,7 +271,7 @@ LogStream& LogStream::operator<<(const void* p)
 // FIXME: replace this with Grisu3 by Florian Loitsch.
 LogStream& LogStream::operator<<(double v)
 {
-	char buf[kMaxNumericSize] = {0};
+	char buf[kMaxNumericSize+1] = {0};
 	int len = snprintf(buf, kMaxNumericSize, "%.12g", v);
 	if (m_LogStrPtr) m_LogStrPtr->append(buf, len);
 
@@ -344,18 +343,25 @@ inline MWLOGSTREAM::LogStream& operator<<(MWLOGSTREAM::LogStream& s, const Sourc
 //////////////////////////////////////////////////////////////////////////////
 const char* LogLevelName[NUM_LOG_LEVELS] =
 {
-  "[TRACE] ",
-  "[DEBUG] ",
-  "[INFO ] ",
-  "[WARN ] ",
-  "[ERROR] ",
-  "[FATAL] ",
+  "[TRACE]",
+  "[DEBUG]",
+  "[INFO ]",
+  "[WARN ]",
+  "[ERROR]",
+  "[FATAL]",
 };
 
 const char* strerror_tl(int savedErrno)
 {
 	char t_errnobuf[512];
 	return strerror_r(savedErrno, t_errnobuf, sizeof t_errnobuf);
+}
+
+std::string format_file_line(int line)
+{
+	char buf[10 + 1] = { 0 };
+	snprintf(buf, 10, "%4d", line);
+	return buf;
 }
 
 class Impl
@@ -384,15 +390,15 @@ Impl::Impl(MWLOGGER::LOG_LEVEL level, int savedErrno, const SourceFile& file, in
     basename_(file)
 {
 	formatTime();
-	stream_ << T(LogLevelName[level], 8);
+	stream_ << LogLevelName[level];
 	mwnet_mt::CurrentThread::tid();
-	stream_ << '[' <<T(mwnet_mt::CurrentThread::tidString(), mwnet_mt::CurrentThread::tidStringLength())<<"] ";
-	stream_ << '[' << basename_ << "::" << func << ',' << line_ << "]" ;
+	stream_ << '[' <<T(mwnet_mt::CurrentThread::tidString(), mwnet_mt::CurrentThread::tidStringLength())<<"]";
+	stream_ << '[' << basename_ << "::" << func << ',' << format_file_line(line_) << "]";
 	if (savedErrno != 0)
 	{
 		stream_ << ' ' << strerror_tl(savedErrno) << " (errno:" << savedErrno << ')';
 	}
-	stream_ << ' ';
+	stream_ << " -  ";
 }
 
 void Impl::formatTime()

@@ -60,6 +60,7 @@ public:
 	// 转换成16进制字符串
 	static std::string& BytesToHexString(const std::string& bytes, std::string& hexStr, bool upper=false); // 默认小写
 	static std::string& BytesToHexString(const char* bytes, size_t len, std::string& hexStr, bool upper=false); // 默认小写
+	static std::string  BytesToHexString(const char* bytes, size_t len, bool upper = false); // 默认小写
 	static bool Bin2Hex(const char* binStr, size_t binLen, std::string* hexStr);	// 固定大写
 
 	// base64编解码

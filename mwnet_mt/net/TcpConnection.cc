@@ -35,6 +35,7 @@ void mwnet_mt::net::defaultConnectionCallback(const TcpConnectionPtr& conn)
 
 void mwnet_mt::net::defaultMessageCallback(const TcpConnectionPtr&,
                                         Buffer* buf,
+										size_t len,
                                         Timestamp)
 {
 	buf->retrieveAll();
@@ -189,7 +190,7 @@ void TcpConnection::sendInLoop(const void* data, size_t len, const boost::any& p
 			loop_->queueInLoop(std::bind(writeErrCallback_, shared_from_this(), params, SEND_DISCONNECTED));
 		}
 
-		LOG_WARN << "disconnected, give up writing";
+		LOG_WARN << "disconnected, give up writing,connuuid:" << conn_uuid_;
 
 		return;
 	}  
@@ -215,7 +216,7 @@ void TcpConnection::sendInLoop(const void* data, size_t len, const boost::any& p
 			nwrote = 0;
 			if (errno != EWOULDBLOCK)
 			{
-				LOG_SYSERR << "TcpConnection::sendInLoop";
+				LOG_SYSERR << "TcpConnection::sendInLoop error,connuuid:" << conn_uuid_;
 				if (errno == EPIPE || errno == ECONNRESET) // FIXME: any others?
 				{
 					faultError = true;
@@ -460,7 +461,7 @@ void TcpConnection::handleRead(Timestamp receiveTime)
 	ssize_t n = inputBuffer_.readFd(channel_->fd(), &savedErrno);
 	if (n > 0)
 	{
-		messageCallback_(shared_from_this(), &inputBuffer_, receiveTime);
+		messageCallback_(shared_from_this(), &inputBuffer_, n, receiveTime);
 
 		inputBuffer_.shrink_if_need(m_nDefRecvBuf);
 	}
@@ -539,7 +540,7 @@ void TcpConnection::handleWrite()
 					shutdownInLoop();
 				}
 			}
-			LOG_SYSERR << "TcpConnection::handleWrite fail:" << conn_uuid_;
+			LOG_SYSERR << "TcpConnection::handleWrite fail,connuuid:" << conn_uuid_;
 	    }
 	}
   }

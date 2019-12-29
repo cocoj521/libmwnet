@@ -9,7 +9,8 @@
 #include <mwnet_mt/base/copyable.h>
 #include <mwnet_mt/base/StringPiece.h>
 #include <mwnet_mt/base/Types.h>
-
+#include <mwnet_mt/base/LogFile.h>
+#include <mwnet_mt/base/Logging.h>
 #include <mwnet_mt/net/Endian.h>
 
 #include <algorithm>
@@ -70,6 +71,12 @@ class Buffer : public mwnet_mt::copyable
   size_t prependableBytes() const
   { return readerIndex_; }
 
+  //从后往前找n字节
+  const char* reverse_peek(size_t n) const
+  {
+	  return (writerIndex_ >= n) ? (beginWrite() - n) : NULL;
+  }
+  
   const char* peek() const
   { return begin() + readerIndex_; }
 

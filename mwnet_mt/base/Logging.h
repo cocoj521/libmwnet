@@ -65,7 +65,7 @@ class Logger
   static LogLevel logLevel();
   static void setLogLevel(LogLevel level);
 
-  typedef void (*OutputFunc)(const char* msg, int len);
+  typedef void (*OutputFunc)(const char* msg, size_t len);
   typedef void (*FlushFunc)();
   static void setOutput(OutputFunc);
   static void setFlush(FlushFunc);

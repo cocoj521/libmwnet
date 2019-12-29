@@ -10,7 +10,7 @@
 #include <mwnet_mt/net/httpparser/httpparser.h>
 #include <mwnet_mt/base/CountDownLatch.h>
 
-//#include <mwnet_mt/util/MWLogger.h>
+#include <mwnet_mt/util/MWStringUtil.h>
 
 #include <boost/ptr_container/ptr_vector.hpp>
 #include <boost/circular_buffer.hpp>
@@ -35,7 +35,7 @@
 using namespace mwnet_mt;
 using namespace mwnet_mt::net;
 using namespace mw_http_parser;
-//using namespace MWLOGGER;
+using namespace MWSTRINGUTIL;
 
 namespace MWNET_MT
 {
@@ -244,13 +244,24 @@ typedef struct _net_ctrl_params
 
 typedef std::shared_ptr<net_ctrl_params> net_ctrl_params_ptr;
 
+//网络库内部透传参数,用于发送时保存上层传来的any参数,并为每一次发送请求编一个惟一的请求ID,在onwriteok/error回调时用于追踪该请求
+struct tInnerParams
+{
+	uint64_t request_id;
+	boost::any params;
+	tInnerParams(uint64_t x, boost::any y)
+	{
+		request_id = x; params = y;
+	}
+};
+
 //-----------------------------------------------------------
 
 //日志
 //..........................................................
 std::unique_ptr<mwnet_mt::LogFile> g_logFile;
 
-void outputFunc(const char* msg, int len)
+void outputFunc(const char* msg, size_t len)
 {
   g_logFile->append(msg, len);
 }
@@ -260,9 +271,10 @@ void flushFunc()
   g_logFile->flush();
 }
 //........................................................
-
-uint64_t MakeConnuuid(uint16_t unique_node_id, AtomicInt64& nSequnceId)
+//首位预留,永远正数,可以最大支持8000个结点,每个结点1秒最大生成16777215个不重复的ID,仅保证1年内不重复.
+uint64_t MakeSnowId(uint16_t unique_node_id, AtomicInt64& nSequnceId)
 {
+	unsigned int sign = 0;
 	unsigned int nYear = 0;
 	unsigned int nMonth = 0;
 	unsigned int nDay = 0;
@@ -270,17 +282,13 @@ uint64_t MakeConnuuid(uint16_t unique_node_id, AtomicInt64& nSequnceId)
 	unsigned int nMin = 0;
 	unsigned int nSec = 0;
 	unsigned int nNodeid = unique_node_id;
-	unsigned int nNo = static_cast<unsigned int>(nSequnceId.getAndAdd(1) % (0x03ffff));
+	unsigned int nNo = static_cast<unsigned int>(nSequnceId.getAndAdd(1) % (0xFFFFFF));
 
   	struct timeval tv;
 	struct tm	   tm_time;
 	gettimeofday(&tv, NULL);
 	localtime_r(&tv.tv_sec, &tm_time);
 
-/*
-  	time_t t = time(NULL);
-  	struct tm tm_time = *localtime(&t);
-*/
 	nYear = tm_time.tm_year+1900;
 	nYear = nYear%100;
 	nMonth = tm_time.tm_mon+1;
@@ -290,14 +298,14 @@ uint64_t MakeConnuuid(uint16_t unique_node_id, AtomicInt64& nSequnceId)
 	nSec = tm_time.tm_sec;
 
 	int64_t j = 0;
-	j |= static_cast<int64_t>(nYear& 0x7f) << 57;   //year 0~99
-	j |= static_cast<int64_t>(nMonth & 0x0f) << 53;//month 1~12
-	j |= static_cast<int64_t>(nDay & 0x1f) << 48;//day 1~31
-	j |= static_cast<int64_t>(nHour & 0x1f) << 43;//hour 0~24
-	j |= static_cast<int64_t>(nMin & 0x3f) << 37;//min 0~59
-	j |= static_cast<int64_t>(nSec & 0x3f) << 31;//second 0~59
-	j |= static_cast<int64_t>(nNodeid & 0x01fff) << 18;//nodeid 1~8000
-	j |= static_cast<int64_t>(nNo & 0x03ffff);	//seqid,0~0x03ffff
+	j |= static_cast<int64_t>(sign) << 63;   //符号位 0
+	j |= static_cast<int64_t>(nMonth & 0x0f) << 59;//month 1~12
+	j |= static_cast<int64_t>(nDay & 0x1f) << 54;//day 1~31
+	j |= static_cast<int64_t>(nHour & 0x1f) << 49;//hour 0~24
+	j |= static_cast<int64_t>(nMin & 0x3f) << 43;//min 0~59
+	j |= static_cast<int64_t>(nSec & 0x3f) << 37;//second 0~59
+	j |= static_cast<int64_t>(nNodeid & 0x01fff) << 24;//nodeid 1~8000
+	j |= static_cast<int64_t>(nNo & 0xFFFFFF);	//seqid,0~0xFFFFFF 0~16777215
 
 	return j;
 }
@@ -326,7 +334,7 @@ public:
 		// 绑定连接事件回调(connect,disconnect)
 		m_server.setConnectionCallback(std::bind(&TcpNetServerImpl::onConnection, this, _1));
 		// 绑定收到的数据回调
-		m_server.setMessageCallback(std::bind(&TcpNetServerImpl::onMessage, this, _1, _2, _3));
+		m_server.setMessageCallback(std::bind(&TcpNetServerImpl::onMessage, this, _1, _2, _3, std::placeholders::_4));
 		// 绑定写数据完成回调
 		m_server.setWriteCompleteCallback(std::bind(&TcpNetServerImpl::onWriteOk, this, _1, _2));
 		// 绑定写数据异常或失败回调
@@ -346,11 +354,34 @@ public:
 	}
 
 	// 发送信息
-	int SendMsgWithTcpServer(const TcpConnectionPtr& conn, const boost::any& params, const char* szMsg, size_t nMsgLen, int timeout, bool bKeepAlive)
+	int OnSendMsg(const TcpConnectionPtr& conn, const boost::any& params, const char* szMsg, size_t nMsgLen, int timeout, bool bKeepAlive)
 	{
+		uint64_t request_id = MakeSnowId(m_ptrCtrlParams->g_unique_node_id, m_ptrCtrlParams->g_nSequnceId);
+		tInnerParams inner_params(request_id, params);
+		boost::any inner_any(inner_params);
+
+		if (m_ptrCtrlParams->g_bEnableRecvLog_tcp)
+		{
+			LOG_INFO << "[TCP][SENDING]"
+				<< "[" << request_id << "]"
+				<< "[" << conn->getConnuuid() << "]"
+				<< "[" << conn->peerAddress().toIpPort() << "]"
+				<< ":" << StringUtil::BytesToHexString(szMsg, nMsgLen);
+		}
+
 		if (!bKeepAlive) conn->setNeedCloseFlag();
-		
-		return conn->send(szMsg, static_cast<int>(nMsgLen), params, timeout);
+		int nSendRet = conn->send(szMsg, static_cast<int>(nMsgLen), inner_any, timeout);
+
+		if (m_ptrCtrlParams->g_bEnableRecvLog_tcp && 0 != nSendRet)
+		{
+			LOG_WARN << "[TCP][SENDERR]"
+				<< "[" << request_id << "]"
+				<< "[" << conn->getConnuuid() << "]"
+				<< "[" << conn->peerAddress().toIpPort() << "]"
+				<< ":" << "SEND ERROR,ERCODE:" << nSendRet;
+		}
+
+		return nSendRet;
 	}
 
 	// 强制关闭连接
@@ -400,7 +431,7 @@ private:
 
 		if (m_ptrCtrlParams->g_unique_node_id >= 1 && m_ptrCtrlParams->g_unique_node_id <= 8000)
 		{
-			uint64_t conn_uuid = MakeConnuuid(m_ptrCtrlParams->g_unique_node_id, m_ptrCtrlParams->g_nSequnceId);
+			uint64_t conn_uuid = MakeSnowId(m_ptrCtrlParams->g_unique_node_id, m_ptrCtrlParams->g_nSequnceId);
 			conn->setConnuuid(conn_uuid);
 			WeakTcpConnectionPtr weakconn(conn);
 			MutexLockGuard lock(m_ptrCtrlParams->g_mapTcpConns_lock);
@@ -518,9 +549,21 @@ private:
 		}
 	}
 
-	void onMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time)
+	void onMessage(const TcpConnectionPtr& conn, Buffer* buf, size_t len, Timestamp time)
 	{
 		if (!conn) return;
+
+		// write logs
+		if (m_ptrCtrlParams->g_bEnableRecvLog_tcp)
+		{
+			uint64_t request_id = MakeSnowId(m_ptrCtrlParams->g_unique_node_id, m_ptrCtrlParams->g_nSequnceId);
+			const char* pRecv = buf->reverse_peek(len);
+			LOG_INFO << "[TCP][RECVOK ]"
+				<< "[" << request_id << "]"
+				<< "[" << conn->getConnuuid() << "]"
+				<< "[" << conn->peerAddress().toIpPort() << "]"
+				<< ":" << (pRecv ? StringUtil::BytesToHexString(pRecv, len) : "RECV NULL");
+		}
 
 		m_ptrCtrlParams->g_nTotalReqNum_Tcp.increment();
 
@@ -548,7 +591,10 @@ private:
 				if (buf->readableBytes() >= m_ptrCtrlParams->g_nMaxRecvBuf_Tcp)
 				{
 					nRet = -1;
-					LOG_WARN<<"[TCP][RECV]["<<conn->getConnuuid()<<"]\nillegal data size:"<<buf->readableBytes()<<",maybe too long\n";
+					LOG_WARN << "[TCP][RECVERR]"
+						<< "[" << conn->getConnuuid() << "]"
+						<< ":illegal data size " << buf->readableBytes() 
+						<< ",larger than " << m_ptrCtrlParams->g_nMaxRecvBuf_Tcp << ",maybe too long\n";
 				}
 			}
 			// 判断返回值，并做不同的处理
@@ -572,6 +618,16 @@ private:
 	{
 		if (!conn) return;
 
+		tInnerParams inner_params(boost::any_cast<tInnerParams>(params));
+
+		if (m_ptrCtrlParams->g_bEnableRecvLog_tcp)
+		{
+			LOG_INFO << "[TCP][SENDOK ]"
+				<< "[" << inner_params.request_id << "]"
+				<< "[" << conn->getConnuuid() << "]"
+				<< "[" << conn->peerAddress().toIpPort() << "]";
+		}
+
 		// 减少总待发出计数
 		m_ptrCtrlParams->g_nTotalWaitSendNum_tcp.decrement();
 
@@ -579,7 +635,7 @@ private:
 		if (m_pfunc_on_sendok)
 		{
 			WeakTcpConnectionPtr weakconn(conn);
-			nRet = m_pfunc_on_sendok(m_pInvoker, conn->getConnuuid(), weakconn, conn->getSessionData(), params);
+			nRet = m_pfunc_on_sendok(m_pInvoker, conn->getConnuuid(), weakconn, conn->getSessionData(), inner_params.params);
 		}
 
 		if (nRet < 0 || conn->bNeedClose())
@@ -594,6 +650,17 @@ private:
 	{
 		if (!conn) return;
 
+		tInnerParams inner_params(boost::any_cast<tInnerParams>(params));
+		
+		if (m_ptrCtrlParams->g_bEnableRecvLog_tcp)
+		{
+			LOG_ERROR << "[TCP][SENDERR]"
+				<< "[" << inner_params.request_id << "]"
+				<< "[" << conn->getConnuuid() << "]"
+				<< "[" << conn->peerAddress().toIpPort() << "]"
+				<< ":" << "SEND ERROR,ERCODE:" << errCode;
+		}
+
 		// 减少总待发出计数
 		m_ptrCtrlParams->g_nTotalWaitSendNum_tcp.decrement();
 
@@ -601,7 +668,7 @@ private:
 		if (m_pfunc_on_senderr)
 		{
 			WeakTcpConnectionPtr weakconn(conn);
-			nRet = m_pfunc_on_senderr(m_pInvoker, conn->getConnuuid(), weakconn, conn->getSessionData(), params, errCode);
+			nRet = m_pfunc_on_senderr(m_pInvoker, conn->getConnuuid(), weakconn, conn->getSessionData(), inner_params.params, errCode);
 		}
 
 		if (nRet < 0 || conn->bNeedClose())
@@ -1041,6 +1108,7 @@ bool HttpRequest::b100ContinueInHeader()
 // 解析http请求
 // 返回值 0:成功 此时要看over是否为true,若为true代表解析完成,若为false代表包未收全
 // 返回值 1:代表解析失败 需关闭连接
+// 返回值 2:代表包过大,需关闭连接
 int	HttpRequest::ParseHttpRequest(const char* data, size_t len, size_t maxlen, bool& over)
 {
 	int nRet = 1;
@@ -1073,7 +1141,7 @@ int	HttpRequest::ParseHttpRequest(const char* data, size_t len, size_t maxlen, b
 		// 若接收了maxlen个长度仍然不是一个完整包,此时关闭连接
 		if (!over && m_strRequest.size() >= maxlen)
 		{
-			nRet = 1;
+			nRet = 2;
 		}
 	}
 
@@ -1363,7 +1431,7 @@ public:
 		// 绑定连接事件回调(connect,disconnect)
 		m_server.setConnectionCallback(std::bind(&HttpNetServerImpl::onConnection, this, _1));
 		// 绑定收到的数据回调
-		m_server.setMessageCallback(std::bind(&HttpNetServerImpl::onMessage, this, _1, _2, _3));
+		m_server.setMessageCallback(std::bind(&HttpNetServerImpl::onMessage, this, _1, _2, _3, std::placeholders::_4));
 		// 绑定写数据完成回调
 		m_server.setWriteCompleteCallback(std::bind(&HttpNetServerImpl::onWriteOk, this, _1, _2));
 		// 绑定写数据异常或失败回调
@@ -1383,13 +1451,34 @@ public:
 	}
 
   	// 回应
-	int SendHttpResponse(const TcpConnectionPtr& conn, const boost::any& params, const HttpResponse& rsp, int timeout)
+	int OnSendMsg(const TcpConnectionPtr& conn, const boost::any& params, const HttpResponse& rsp, int timeout)
 	{
-		if (!rsp.IsKeepAlive()) conn->setNeedCloseFlag();
-		
-		if (m_ptrCtrlParams->g_bEnableSendLog_http) LOG_INFO << "[HTTP][SEND][" << conn->getConnuuid() << "]\n" << rsp.GetHttpResponse().c_str();
+		uint64_t request_id = MakeSnowId(m_ptrCtrlParams->g_unique_node_id, m_ptrCtrlParams->g_nSequnceId);
+		tInnerParams inner_params(request_id, params);
+		boost::any inner_any(inner_params);
 
-		return conn->send(rsp.GetHttpResponse(), params, timeout);
+		if (m_ptrCtrlParams->g_bEnableSendLog_http)
+		{
+			LOG_INFO << "[HTTP][SENDING]"
+				<< "[" << request_id << "]"
+				<< "[" << conn->getConnuuid() << "]"
+				<< "[" << conn->peerAddress().toIpPort() << "]"
+				<< ":" << rsp.GetHttpResponse();
+		}
+
+		if (!rsp.IsKeepAlive()) conn->setNeedCloseFlag();
+		int nSendRet = conn->send(rsp.GetHttpResponse(), inner_any, timeout);
+
+		if (m_ptrCtrlParams->g_bEnableSendLog_http && 0 != nSendRet)
+		{
+			LOG_WARN << "[HTTP][SENDERR]"
+				<< "[" << request_id << "]"
+				<< "[" << conn->getConnuuid() << "]"
+				<< "[" << conn->peerAddress().toIpPort() << "]"
+				<< ":" << "SEND ERROR,ERCODE:" << nSendRet;
+		}
+
+		return nSendRet;
 	}
 
 	// 强制关闭连接
@@ -1430,7 +1519,7 @@ private:
 
 		if (m_ptrCtrlParams->g_unique_node_id >= 1 && m_ptrCtrlParams->g_unique_node_id <= 8000)
 		{
-			uint64_t conn_uuid = MakeConnuuid(m_ptrCtrlParams->g_unique_node_id, m_ptrCtrlParams->g_nSequnceId);
+			uint64_t conn_uuid = MakeSnowId(m_ptrCtrlParams->g_unique_node_id, m_ptrCtrlParams->g_nSequnceId);
 			conn->setConnuuid(conn_uuid);
 			WeakTcpConnectionPtr weakconn(conn);
 			MutexLockGuard lock(m_ptrCtrlParams->g_mapHttpConns_lock);
@@ -1562,8 +1651,6 @@ private:
 			HttpRequestPtr reqptr = boost::any_cast<HttpRequestPtr>(conn->getExInfo());
 			// Buffer to StringPiece
 			StringPiece strRecvMsg = buf->toStringPiece();
-			// write logs
-			if (m_ptrCtrlParams->g_bEnableRecvLog_http) LOG_INFO << "[HTTP][RECV][" << conn->getConnuuid() << "][" << conn->peerAddress().toIpPort() << "]\n" << strRecvMsg.data();
 			bool bParseOver = false;
 			// 执行解析
 			int nParseRet = reqptr->ParseHttpRequest(strRecvMsg.data(), strRecvMsg.size(), m_ptrCtrlParams->g_nMaxRecvBuf_Http, bParseOver);
@@ -1609,15 +1696,33 @@ private:
 					// 并且没有回过,则响应100-Continue
 					if (!reqptr->HasRsp100Continue() && reqptr->b100ContinueInHeader())
 					{
+						boost::any params;
+						uint64_t request_id = MakeSnowId(m_ptrCtrlParams->g_unique_node_id, m_ptrCtrlParams->g_nSequnceId);
+						tInnerParams inner_params(request_id, params);
+						boost::any inner_any(inner_params);
+
+						if (m_ptrCtrlParams->g_bEnableSendLog_http)
+						{
+							LOG_INFO << "[HTTP][SENDING]"
+								<< "[" << request_id << "]"
+								<< "[" << conn->getConnuuid() << "]"
+								<< "[" << conn->peerAddress().toIpPort() << "]"
+								<< ":" << "100-continue";
+						}
+
 						//置已回应过100continue标志
 						reqptr->SetHasRsp100Continue();
-
 						// 回应100-continue
-						boost::any params;
-						conn->send("100-continue", params);
+						int nSendRet = conn->send("100-continue", inner_any);
 
-						// 记录日志
-						if (m_ptrCtrlParams->g_bEnableSendLog_http) LOG_INFO << "[HTTP][SEND][" << conn->getConnuuid() << "][" << conn->peerAddress().toIpPort() << "]\n100-continue";
+						if (m_ptrCtrlParams->g_bEnableSendLog_http && 0 != nSendRet)
+						{
+							LOG_WARN << "[HTTP][SENDERR]"
+								<< "[" << request_id << "]"
+								<< "[" << conn->getConnuuid() << "]"
+								<< "[" << conn->peerAddress().toIpPort() << "]"
+								<< ":" << "SEND ERROR,ERCODE:" << nSendRet;
+						}
 					}
 
 					// 将buf中的指针归位
@@ -1629,6 +1734,21 @@ private:
 			}
 			else
 			{
+				std::string strBadRequest = "HTTP/1.1 400 Bad Request\r\n\r\n";
+				std::string strErrMsg = "http parse fail";
+				if (1 == nParseRet)
+				{
+					strErrMsg = "http parse fail";
+				}
+				else if (2 == nParseRet)
+				{
+					strErrMsg = "http request overlength";
+				}
+
+				LOG_WARN << "[HTTP][RECVERR]"
+					<< "[" << conn->getConnuuid() << "]"
+					<< ":" << strErrMsg;
+
 				// 将buf中的指针移归位
 				buf->retrieveAll();
 
@@ -1641,19 +1761,50 @@ private:
 				// 设置连接需要关闭标志
 				conn->setNeedCloseFlag();
 
-				// 解析失败，直接生成失败的response,回:400
 				boost::any params;
-				conn->send("HTTP/1.1 400 Bad Request\r\n\r\n", params);
+				uint64_t request_id = MakeSnowId(m_ptrCtrlParams->g_unique_node_id, m_ptrCtrlParams->g_nSequnceId);
+				tInnerParams inner_params(request_id, params);
+				boost::any inner_any(inner_params);
 
-				// 记录日志
-				LOG_WARN<<"[HTTP][SEND]["<<conn->getConnuuid()<<"]["<<conn->peerAddress().toIpPort()<<"]\nillegal data size or illegal data format\nHTTP/1.1 400 Bad Request\r\n\r\n";
+				if (m_ptrCtrlParams->g_bEnableSendLog_http)
+				{
+					LOG_WARN << "[HTTP][SENDING]"
+						<< "[" << request_id << "]"
+						<< "[" << conn->getConnuuid() << "]"
+						<< "[" << conn->peerAddress().toIpPort() << "]"
+						<< ":" << strBadRequest << strErrMsg;
+				}
+
+				// 解析失败，直接生成失败的response,回:400
+				int nSendRet = conn->send(strBadRequest + strErrMsg, inner_any);
+
+				if (m_ptrCtrlParams->g_bEnableSendLog_http && 0 != nSendRet)
+				{
+					LOG_WARN << "[HTTP][SENDERR]"
+						<< "[" << request_id << "]"
+						<< "[" << conn->getConnuuid() << "]"
+						<< "[" << conn->peerAddress().toIpPort() << "]"
+						<< ":" << "SEND ERROR,ERCODE:" << nSendRet;
+				}
 			}
 		}
 	}
 
-	void onMessage(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time)
+	void onMessage(const TcpConnectionPtr& conn, Buffer* buf, size_t len, Timestamp time)
 	{
 		if (!conn) return;
+
+		// write logs
+		if (m_ptrCtrlParams->g_bEnableRecvLog_http)
+		{
+			uint64_t request_id = MakeSnowId(m_ptrCtrlParams->g_unique_node_id, m_ptrCtrlParams->g_nSequnceId);
+			const char* pRecv = buf->reverse_peek(len);
+			LOG_INFO << "[HTTP][RECVOK ]"
+				<< "[" << request_id << "]"
+				<< "[" << conn->getConnuuid() << "]"
+				<< "[" << conn->peerAddress().toIpPort() << "]"
+				<< ":" << (pRecv ? pRecv : "RECV NULL");
+		}
 
 		m_ptrCtrlParams->g_nTotalReqNum_Http.increment();
 
@@ -1666,6 +1817,16 @@ private:
 	{
 		if (!conn) return;
 
+		tInnerParams inner_params(boost::any_cast<tInnerParams>(params));
+
+		if (m_ptrCtrlParams->g_bEnableRecvLog_http)
+		{
+			LOG_INFO << "[HTTP][SENDOK ]"
+				<< "[" << inner_params.request_id << "]"
+				<< "[" << conn->getConnuuid() << "]"
+				<< "[" << conn->peerAddress().toIpPort() << "]";
+		}
+
 		// 减少总待发出计数
 		m_ptrCtrlParams->g_nTotalWaitSendNum_http.decrement();
 		
@@ -1673,7 +1834,7 @@ private:
 		if (m_pfunc_on_sendok)
 		{
 			WeakTcpConnectionPtr weakconn(conn);
-			nRet = m_pfunc_on_sendok(m_pInvoker, conn->getConnuuid(), weakconn, conn->getSessionData(), params);
+			nRet = m_pfunc_on_sendok(m_pInvoker, conn->getConnuuid(), weakconn, conn->getSessionData(), inner_params.params);
 		}
 
 		if (nRet < 0 || conn->bNeedClose())
@@ -1688,6 +1849,17 @@ private:
 	{
 		if (!conn) return;
 
+		tInnerParams inner_params(boost::any_cast<tInnerParams>(params));
+
+		if (m_ptrCtrlParams->g_bEnableRecvLog_http)
+		{
+			LOG_ERROR << "[HTTP][SENDERR]"
+				<< "[" << inner_params.request_id << "]"
+				<< "[" << conn->getConnuuid() << "]"
+				<< "[" << conn->peerAddress().toIpPort() << "]"
+				<< ":" << "SEND ERROR,ERCODE:" << errCode;
+		}
+
 		// 减少总待发出计数
 		m_ptrCtrlParams->g_nTotalWaitSendNum_http.decrement();
 
@@ -1695,7 +1867,7 @@ private:
 		if (m_pfunc_on_senderr)
 		{
 			WeakTcpConnectionPtr weakconn(conn);
-			nRet = m_pfunc_on_senderr(m_pInvoker, conn->getConnuuid(), weakconn, conn->getSessionData(), params, errCode);
+			nRet = m_pfunc_on_senderr(m_pInvoker, conn->getConnuuid(), weakconn, conn->getSessionData(), inner_params.params, errCode);
 		}
 
 		if (nRet < 0 || conn->bNeedClose())
@@ -1934,7 +2106,7 @@ public:
 				ConnNodePtr node(boost::any_cast<ConnNodePtr>(pConn->getContext()));
 				if (node)
 				{
-					ret = m_TcpNetServerImpls[node->GetIndex()]->SendMsgWithTcpServer(pConn, params, szMsg, nMsgLen, timeout, bKeepAlive);
+					ret = m_TcpNetServerImpls[node->GetIndex()]->OnSendMsg(pConn, params, szMsg, nMsgLen, timeout, bKeepAlive);
 				}
 			}
 			// 增加待发出总的计数
@@ -2249,7 +2421,7 @@ public:
 				ConnNodePtr node(boost::any_cast<ConnNodePtr>(pConn->getContext()));
 				if (node)
 				{
-					ret = m_HttpNetServerImpls[node->GetIndex()]->SendHttpResponse(pConn, params, rsp, timeout);
+					ret = m_HttpNetServerImpls[node->GetIndex()]->OnSendMsg(pConn, params, rsp, timeout);
 				}
 			}
 			// 增加待发出总的计数

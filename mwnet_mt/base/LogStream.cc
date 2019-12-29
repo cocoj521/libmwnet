@@ -109,11 +109,9 @@ void LogStream::staticCheck()
 template<typename T>
 void LogStream::formatInteger(T v)
 {
-  if (buffer_.avail() >= kMaxNumericSize)
-  {
-    size_t len = convert(buffer_.current(), v);
-    buffer_.add(len);
-  }
+	char buf[kMaxNumericSize + 1] = { 0 };
+	size_t len = convert(buf, v);
+	p_buffer_->append(buf, len);
 }
 
 LogStream& LogStream::operator<<(short v)
@@ -166,27 +164,22 @@ LogStream& LogStream::operator<<(unsigned long long v)
 
 LogStream& LogStream::operator<<(const void* p)
 {
-  uintptr_t v = reinterpret_cast<uintptr_t>(p);
-  if (buffer_.avail() >= kMaxNumericSize)
-  {
-    char* buf = buffer_.current();
-    buf[0] = '0';
-    buf[1] = 'x';
-    size_t len = convertHex(buf+2, v);
-    buffer_.add(len+2);
-  }
-  return *this;
+	uintptr_t v = reinterpret_cast<uintptr_t>(p);
+	char buf[kMaxNumericSize + 1] = { 0 };
+	buf[0] = '0';
+	buf[1] = 'x';
+	size_t len = convertHex(buf + 2, v);
+	p_buffer_->append(buf, len + 2);
+	return *this;
 }
 
 // FIXME: replace this with Grisu3 by Florian Loitsch.
 LogStream& LogStream::operator<<(double v)
 {
-  if (buffer_.avail() >= kMaxNumericSize)
-  {
-    int len = snprintf(buffer_.current(), kMaxNumericSize, "%.12g", v);
-    buffer_.add(len);
-  }
-  return *this;
+	char buf[kMaxNumericSize + 1] = { 0 };
+	int len = snprintf(buf, kMaxNumericSize, "%.12g", v);
+	p_buffer_->append(buf, len);
+	return *this;
 }
 
 template<typename T>

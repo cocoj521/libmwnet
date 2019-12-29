@@ -36,12 +36,12 @@ Logger::LogLevel g_logLevel = initLogLevel();
 
 const char* LogLevelName[Logger::NUM_LOG_LEVELS] =
 {
-	"[TRACE] ",
-	"[DEBUG] ",
-	"[INFO ] ",
-	"[WARN ] ",
-	"[ERROR] ",
-	"[FATAL] ",
+	"[TRACE]",
+	"[DEBUG]",
+	"[INFO ]",
+	"[WARN ]",
+	"[ERROR]",
+	"[FATAL]",
 };
 
 // helper class for known string length at compile time
@@ -71,7 +71,7 @@ inline LogStream& operator<<(LogStream& s, const Logger::SourceFile& v)
   return s;
 }
 
-void defaultOutput(const char* msg, int len)
+void defaultOutput(const char* msg, size_t len)
 {
   size_t n = fwrite(msg, 1, len, stdout);
   //FIXME check n
@@ -89,6 +89,13 @@ TimeZone g_logTimeZone;
 
 }
 
+std::string format_file_line(int line)
+{
+	char buf[10 + 1] = { 0 };
+	snprintf(buf, 10, "%4d", line);
+	return buf;
+}
+
 using namespace mwnet_mt;
 
 Logger::Impl::Impl(LogLevel level, int savedErrno, const SourceFile& file, int line, const std::string& func)
@@ -100,16 +107,16 @@ Logger::Impl::Impl(LogLevel level, int savedErrno, const SourceFile& file, int l
     func_(func)
 {
   formatTime();
-  stream_ << T(LogLevelName[level], 8);
+  stream_ << LogLevelName[level];
   CurrentThread::tid();
-  stream_ << '[' << T(CurrentThread::tidString(), CurrentThread::tidStringLength())<<"] ";
-  stream_ << '[' << basename_ << "::" << func << "," << line_ << "]";
+  stream_ << '[' << T(CurrentThread::tidString(), CurrentThread::tidStringLength())<<"]";
+  stream_ << '[' << basename_ << "::" << func << "," << format_file_line(line_) << "]";
   if (savedErrno != 0)
   {
     stream_ << ' ' << strerror_tl(savedErrno) << " (errno=" << savedErrno << ')';
   }
 
-  stream_ << ' ';
+  stream_ << " - ";
 }
 
 void Logger::Impl::formatTime()
@@ -191,8 +198,8 @@ Logger::Logger(SourceFile file, int line, bool toAbort, const char* func)
 Logger::~Logger()
 {
   impl_.finish();
-  const LogStream::Buffer& buf(stream().buffer());
-  g_output(buf.data(), buf.length());
+  const std::shared_ptr<std::string>& buf = stream().buffer();
+  g_output(buf->data(), buf->size());
   if (impl_.level_ == FATAL)
   {
     g_flush();

@@ -79,8 +79,8 @@ class TcpConnection : noncopyable,
   // return true if success.
   bool getTcpInfo(struct tcp_info*) const;
   string getTcpInfoString() const;
-  void	setConnuuid(int64_t conn_uuid) { conn_uuid_ = conn_uuid; }
-  int64_t getConnuuid() const { return conn_uuid_; }
+  void	setConnuuid(uint64_t conn_uuid) { conn_uuid_ = conn_uuid; }
+  uint64_t getConnuuid() const { return conn_uuid_; }
   void setDefRecvBuf(size_t nDefRecvBuf) { m_nDefRecvBuf = nDefRecvBuf; }
   size_t getDefRecvBuf() { return m_nDefRecvBuf; }
   void setMaxRecvBuf(size_t nMaxRecvBuf) { m_nMaxRecvBuf = nMaxRecvBuf; }
@@ -205,7 +205,7 @@ class TcpConnection : noncopyable,
 private:
   bool needclose_;	//是否需要关闭
   string name_;
-  int64_t conn_uuid_;
+  uint64_t conn_uuid_;
   std::string strweakptr_;
   EventLoop* loop_;
   StateE state_;  // FIXME: use atomic variable

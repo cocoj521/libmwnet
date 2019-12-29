@@ -3,7 +3,6 @@
 
 #include <mwnet_mt/base/Mutex.h>
 #include <mwnet_mt/base/Types.h>
-
 #include <memory>
 
 namespace mwnet_mt

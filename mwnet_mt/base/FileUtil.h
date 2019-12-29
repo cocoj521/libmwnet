@@ -75,7 +75,7 @@ class AppendFile : noncopyable
   size_t write(const char* logline, size_t len);
 
   FILE* fp_;
-  char buffer_[64*1024];
+  char buffer_[64*1024];//文件读写缓冲区大小
   size_t writtenBytes_;
 };
 }

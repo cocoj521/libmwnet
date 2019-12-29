@@ -390,6 +390,13 @@ std::string& StringUtil::BytesToHexString(const char* bytes, size_t len, std::st
 	return hexStr;
 }
 
+std::string  StringUtil::BytesToHexString(const char* bytes, size_t len, bool upper)
+{
+	std::string strHexStr = "";
+	StrToHex(bytes, len, strHexStr, upper);
+	return strHexStr;
+}
+
 std::string& StringUtil::BytesToBase64String(const std::string& bytes, std::string& base64Str)
 {
 	return BytesToBase64String(bytes.data(), bytes.size(), base64Str);

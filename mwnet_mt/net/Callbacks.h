@@ -68,12 +68,14 @@ typedef std::function<void (const TcpConnectionPtr&, size_t)> HighWaterMarkCallb
 
 // the data has been read to (buf, len)
 typedef std::function<void (const TcpConnectionPtr&,
-                            Buffer*,
+                            Buffer*,	//返回上层尚未读取的数据(如果上层一直不读取,会越来越大)
+							size_t,		//返回本次网络接收的长度
                             Timestamp)> MessageCallback;
 
 void defaultConnectionCallback(const TcpConnectionPtr& conn);
 void defaultMessageCallback(const TcpConnectionPtr& conn,
                             Buffer* buffer,
+							size_t,
                             Timestamp receiveTime);
 
 }

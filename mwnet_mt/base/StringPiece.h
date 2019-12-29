@@ -42,11 +42,7 @@
 
 #include <string.h>
 #include <iosfwd>    // for ostream forward-declaration
-
 #include <mwnet_mt/base/Types.h>
-#ifndef MWNET_MT_STD_STRING
-#include <string>
-#endif
 
 namespace mwnet_mt {
 
