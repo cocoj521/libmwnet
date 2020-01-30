@@ -51,12 +51,12 @@ int func_onmsg_cb(void* pInvoker, uint64_t req_uuid, const boost::any& params, c
 		LOG_INFO 
 				 << "URL:" << response->GetEffectiveUrl() << ",code:" << response->GetErrCode() << ",desc:" << response->GetErrDesc() 
 			     << "\n" << "ResponseCode:" << response->GetRspCode() 
-			     << " totaltm:" << response->GetReqTotalConsuming()/1000 << "ms"
-			     << " conntm:" << response->GetReqConnectConsuming()/1000 << "ms"
-			     << " nameloopuptm:" << response->GetReqNameloopupConsuming()/1000 << "ms"
-			     << " reqinquetm:"<<response->GetReqInQueTime()/1000 << "ms"
-				 << " reqsdtm:" <<response->GetReqSendTime()/1000 << "ms"
-			     << " rsprecvtm:" << response->GetRspRecvTime()/1000 << "ms"
+			     << " TotalConsuming:" << response->GetReqTotalConsuming() << "ms"
+			     << " ConnectConsuming:" << response->GetReqConnectConsuming() << "ms"
+			     << " NameloopupConsuming:" << response->GetReqNameloopupConsuming() << "ms"
+			     << " ReqInQueTm:"<<response->GetReqInQueTime()
+				 << " ReqSendTm:" <<response->GetReqSendTime()
+			     << " RspRecvTm:" << response->GetRspRecvTime()
 			     << "\n" << response->GetHeader() << response->GetBody();
 	}
 	return 0;
@@ -75,7 +75,7 @@ void test(int post_get, const std::string& strHttpUrl, const std::string& strHtt
 														g_nKeepAlive);
 	if (http_request)
 	{
-		LOG_DEBUG << "GetHttpRequest:" << http_request->GetReqUUID();
+		LOG_TRACE << "GetHttpRequest:" << http_request->GetReqUUID();
 
 		
 		http_request->SetTimeOut(30, 60);
@@ -86,22 +86,21 @@ void test(int post_get, const std::string& strHttpUrl, const std::string& strHtt
 		http_request->SetBody(strBodyTmp);
 		
 		boost::any params(http_request);
-		while (0 != http_cli.SendHttpRequest(http_request, params, false))
+		int nRet = http_cli.SendHttpRequest(http_request, params, true);
+		if (0 != nRet)
 		{
-			//LOG_INFO << "-=-=-=-=-=-=-=SendHttpRequest Error-=-=-=-==-=";
-			usleep(1000*10);
+			LOG_ERROR << "SendHttpRequest Error:" << nRet;
 		}
 		
 		//sleep(5);
 		//http_cli.CancelHttpRequest(http_request);
 		//LOG_INFO << "-=-=-=-=-=-=-=CancelHttpRequest-=-=-=-==-=";
 		//sleep(3600);
-		LOG_DEBUG << "SendHttpRequest:" << http_request->GetReqUUID();
+		LOG_TRACE << "SendHttpRequest:" << http_request->GetReqUUID();
 	}
 	else
 	{
-		printf("GetHttpRequest Error\n");		
-		usleep(1*1);
+		LOG_ERROR << "GetHttpRequest Error";
 	}
 }
 
@@ -154,8 +153,9 @@ int main(int argc, char* argv[])
 	if (!bPrintLog)
 	{
 		mkdir("./curltestlogs", 0755);
-		if (!g_logFile) g_logFile.reset(new mwnet_mt::LogFile("./curltestlogs/", "curltestlog", 1024*1024*1024, true, 5, 1024));
-	  	mwnet_mt::Logger::setOutput(outputFunc);
+		if (!g_logFile) g_logFile.reset(new mwnet_mt::LogFile("./curltestlogs/", "curltestlog", 1024*1024*1024, true, 0, 1));
+		mwnet_mt::Logger::setLogLevel(mwnet_mt::Logger::LogLevel::INFO);
+		mwnet_mt::Logger::setOutput(outputFunc);
 	  	mwnet_mt::Logger::setFlush(flushFunc);
 	}
 
@@ -190,11 +190,11 @@ int main(int argc, char* argv[])
 	
 	// ËÙ¶È»ã×Ü
 	if ((time(NULL)-t1) > 0) printf("end,totalcnt:%d,spd:%d\n", totalsend, static_cast<int>(totalsend/(time(NULL)-t1))*1);
-	
-	sleep(30);
 
-	//goto AGAIN;
+	http_cli.ExitHttpClient();
 		
+	sleep(3);
+
 	return 0;
 }
 

@@ -90,9 +90,10 @@ void HttpRequesting::clear()
 {
 	std::lock_guard<std::mutex> lock(mutex_requesting_);
 	std::map<uint64_t, CurlRequestPtr>::iterator it = requestings_.begin();
-	for (; it != requestings_.end(); ++it)
+	for (; it != requestings_.end(); )
 	{
-		it->second->forceCancel();
+		it->second->forceCancelInner();
+		requestings_.erase(it++);
 	}
 }
 
@@ -159,7 +160,7 @@ void HttpWaitRequest::clear()
 	std::list<CurlRequestPtr>::iterator it = wait_requests_.begin();
 	for (; it != wait_requests_.end(); )
 	{
-		(*it)->req_time_ = CurlRequest::now();
+		(*it)->req_time_ = Timestamp::GetCurrentTimeUs();
 		(*it)->done(10055, "Force Cancel Request");
 		wait_requests_.erase(it++);
 		--list_size_;

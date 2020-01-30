@@ -31,7 +31,7 @@ class EventLoopThreadPool : noncopyable
   ~EventLoopThreadPool();
   void setThreadNum(int numThreads) { numThreads_ = numThreads; }
   void start(const ThreadInitCallback& cb = ThreadInitCallback());
-
+  void startThrPool(){ start(); };
   // valid after calling start()
   /// round-robin
   EventLoop* getNextLoop();

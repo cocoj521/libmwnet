@@ -217,7 +217,7 @@ private:
 	//sessioninfo为调用settcpsessioninfo,sethttpsessioninfo时传入的sessioninfo
 	typedef int (*pfunc_on_readmsg_tcp)(void* pInvoker, uint64_t conn_uuid, const boost::any& conn, const boost::any& sessioninfo, const char* szMsg, int nMsgLen, int& nReadedLen);
 
-	//从网络层读取到信息的回调(适用于tcpserver)
+	//从网络层读取到信息的回调(适用于httpserver)
 	//返回值0:代表成功 >0代表其他各种错误或反控等信息(待定) <0:底层会主动强制关闭连接
 	//注意:pHttpReq离开回调函数后指针将自失效,绝对不可以仅保存指针至后续业务代码中使用,必须在离开回调函数前保存有用数据!!!
 	//sessioninfo为调用settcpsessioninfo,sethttpsessioninfo时传入的sessioninfo

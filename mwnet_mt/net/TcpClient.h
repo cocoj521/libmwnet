@@ -19,7 +19,8 @@ static const size_t kInitialSendQue = 512;
 class Connector;
 typedef std::shared_ptr<Connector> ConnectorPtr;
 
-class TcpClient : noncopyable
+class TcpClient : noncopyable,
+	public std::enable_shared_from_this<TcpClient>
 {
  public:
   // TcpClient(EventLoop* loop);
@@ -36,9 +37,9 @@ class TcpClient : noncopyable
   void setNewAddr(const InetAddress& serverAddr);
   const InetAddress& getInetAddress() const {return serverAddr_;}
   void connect();
+  void connect(int conn_timeout);
   void disconnect();
   void stop();
-  void quitconnect();
 
   TcpConnectionPtr connection() const
   {
@@ -54,7 +55,7 @@ class TcpClient : noncopyable
 
   /// Set connection callback.
   /// Not thread safe.
-  void setConnectionCallback(const ConnectionCallback& cb)
+  void setConnectionCallback(const ConnectionCallback2& cb)
   { connectionCallback_ = cb; }
 
   /// Set message callback.
@@ -67,29 +68,38 @@ class TcpClient : noncopyable
   void setWriteCompleteCallback(const WriteCompleteCallback& cb)
   { writeCompleteCallback_ = cb; }
 
+  /// Set write err callback.
+  /// Not thread safe.
+  void setWriteErrCallback(const WriteErrCallback& cb)
+  { writeErrCallback_ = cb; }
+  
 #ifdef __GXX_EXPERIMENTAL_CXX0X__DONOT_USE
-  void setConnectionCallback(ConnectionCallback&& cb)
+  void setConnectionCallback(ConnectionCallback2&& cb)
   { connectionCallback_ = std::move(cb); }
   void setMessageCallback(MessageCallback&& cb)
   { messageCallback_ = std::move(cb); }
   void setWriteCompleteCallback(WriteCompleteCallback&& cb)
   { writeCompleteCallback_ = std::move(cb); }
+  void setWriteErrCallback(const WriteErrCallback& cb)
+  { writeErrCallback_ = std::move(cb); }
 #endif
 
  private:
   /// Not thread safe, but in loop
-  void newConnection(int sockfd);
+  void newConnection(int sockfd, int sockErr, int otherErr);
   /// Not thread safe, but in loop
   void removeConnection(const TcpConnectionPtr& conn);
+  // set it to TcpConnection
+  void onNewConnection(const TcpConnectionPtr& conn);
 
   EventLoop* loop_;
   ConnectorPtr connector_; // avoid revealing Connector
   const string name_;
-  ConnectionCallback connectionCallback_;
+  ConnectionCallback2 connectionCallback_;
   MessageCallback messageCallback_;
   WriteCompleteCallback writeCompleteCallback_;
+  WriteErrCallback writeErrCallback_;
   // always in loop thread
-  int nextConnId_;
   mutable MutexLock mutex_;
   TcpConnectionPtr connection_; // @GuardedBy mutex_
   InetAddress serverAddr_;

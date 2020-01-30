@@ -128,17 +128,17 @@ public:
 	//获取回应对应的请求的重定向URL地址
 	const std::string& GetRedirectUrl() const;
 
-	//获取耗时(单位:微秒)
+	//获取耗时(单位:毫秒)
 	//total:总耗时,connect:连接耗时,nameloopup:域名解析耗时
 	void   GetTimeConsuming(uint32_t& total, uint32_t& connect, uint32_t& namelookup) const;
 
-	//获取回应对应的请求整体耗时(单位:微秒)
+	//获取回应对应的请求整体耗时(单位:毫秒)
 	uint32_t   GetReqTotalConsuming() const;
 
-	//获取回应对应的请求连接耗时(单位:微秒)
+	//获取回应对应的请求连接耗时(单位:毫秒)
 	uint32_t   GetReqConnectConsuming() const;
 
-	//获取回应对应的请求域名解析耗时(单位:微秒)
+	//获取回应对应的请求域名解析耗时(单位:毫秒)
 	uint32_t   GetReqNameloopupConsuming() const;
 	
 	//获取回应返回的时间(精确到微秒)

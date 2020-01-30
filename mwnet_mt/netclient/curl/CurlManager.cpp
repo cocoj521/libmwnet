@@ -234,9 +234,9 @@ CurlRequestPtr CurlManager::getRequest(const std::string& url, bool bKeepAlive, 
 	return p;
 }
 // 判断事件循环中是否还有未完成事件
-bool CurlManager::isLoopRunning()
+size_t CurlManager::isLoopRunning()
 {
-	return loop_->queueSize() > 0;
+	return loop_->queueSize();
 }
 
 void CurlManager::notifySendRequest()
@@ -259,7 +259,7 @@ int CurlManager::sendRequest(const CurlRequestPtr& request)
 {
 	int nRet = 0;
 
-	request->req_inque_time_ = CurlRequest::now();
+	request->req_inque_time_ = Timestamp::GetCurrentTimeUs();
 	
 	// 先判断是否超过最大并发数
 	if (HttpRequesting::GetInstance().isFull())
@@ -363,9 +363,21 @@ void CurlManager::forceCancelRequest(uint64_t req_uuid)
 		// 将请求从发送中队列移除
 		HttpRequesting::GetInstance().remove(request);
 		// 回调中断请求
-		loop_->queueInLoop(std::bind(&CurlRequest::done, request, 10055, "Request was aborted by httpclient"));
-		//request->done(10055, "Force Cancel Request");
+		loop_->queueInLoop(std::bind(&CurlRequest::done, request, 10055, "Request aborted manually"));
 	}
+}
+
+// 处理中断请求(内部调用)
+void CurlManager::forceCancelRequestInner(const CurlRequestPtr& request)
+{
+	LOG_DEBUG << "CurlManager::forceCancelRequestInner " << request->getReqUUID();
+	
+	// 移除内部定时器
+	loop_->cancel(request->timerid_);
+	// 将请求移出管理器
+	removeMultiHandle(request);
+	// 回调中断请求
+	loop_->queueInLoop(std::bind(&CurlRequest::done, request, 10055, "Request aborted manually"));
 }
 
 // 内部定时器超时响应函数

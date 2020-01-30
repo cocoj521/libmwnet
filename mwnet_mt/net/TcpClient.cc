@@ -13,24 +13,12 @@
 using namespace mwnet_mt;
 using namespace mwnet_mt::net;
 
-// TcpClient::TcpClient(EventLoop* loop)
-//   : loop_(loop)
-// {
-// }
-
-// TcpClient::TcpClient(EventLoop* loop, const string& host, uint16_t port)
-//   : loop_(CHECK_NOTNULL(loop)),
-//     serverAddr_(host, port)
-// {
-// }
-
 namespace mwnet_mt
 {
 	namespace net
 	{
 		namespace detail
 		{
-
 			void removeConnection(EventLoop* loop, const TcpConnectionPtr& conn)
 			{
 				loop->queueInLoop(std::bind(&TcpConnection::connectDestroyed, conn));
@@ -38,9 +26,7 @@ namespace mwnet_mt
 
 			void removeConnector(const ConnectorPtr& connector)
 			{
-				//connector->
 			}
-
 		}
 	}
 }
@@ -51,19 +37,17 @@ TcpClient::TcpClient(EventLoop* loop,
 	size_t nDefRecvBuf,
 	size_t nMaxRecvBuf,
 	size_t nMaxSendQue)
-
 	: loop_(CHECK_NOTNULL(loop)),
 	connector_(new Connector(loop, serverAddr)),
 	name_(nameArg),
-	connectionCallback_(defaultConnectionCallback),
-	messageCallback_(defaultMessageCallback),
-	nextConnId_(1),
+	connectionCallback_(NULL),
+	messageCallback_(NULL),
 	serverAddr_(serverAddr),
 	m_nDefRecvBuf(nDefRecvBuf),
 	m_nMaxRecvBuf(nMaxRecvBuf),
 	m_nMaxSendQue(nMaxSendQue)
 {
-	connector_->setNewConnectionCallback(std::bind(&TcpClient::newConnection, this, _1));
+	connector_->setNewConnectionCallback(std::bind(&TcpClient::newConnection, this, _1, _2, _3));
 }
 
 TcpClient::~TcpClient()
@@ -91,8 +75,10 @@ TcpClient::~TcpClient()
 	{
 		connector_->stop();
 		// FIXME: HACK
-		loop_->runAfter(1, std::bind(&detail::removeConnector, connector_));
+		//loop_->runAfter(1, std::bind(&detail::removeConnector, connector_));
+		loop_->queueInLoop(std::bind(&detail::removeConnector, connector_));
 	}
+	//LOG_INFO << "TcpClient::~TcpClient()";
 }
 
 void TcpClient::setNewAddr(const InetAddress& serverAddr)
@@ -105,15 +91,18 @@ void TcpClient::connect()
 	connector_->start();
 }
 
+void TcpClient::connect(int conn_timeout)
+{
+	connector_->start(conn_timeout);
+}
+
 void TcpClient::disconnect()
 {
-
+	MutexLockGuard lock(mutex_);
+	if (connection_)
 	{
-		MutexLockGuard lock(mutex_);
-		if (connection_)
-		{
-			connection_->shutdown();
-		}
+		connection_->shutdown();
+		connection_->forceClose();
 	}
 }
 
@@ -122,35 +111,29 @@ void TcpClient::stop()
 	connector_->stop();
 }
 
-void TcpClient::quitconnect()
-{
-
-	{
-		MutexLockGuard lock(mutex_);
-		if (connection_)
-		{
-			connection_->shutdown();
-			connection_->forceClose();
-		}
-	}
-}
-
 void TcpClient::enableRetry()
 {
 	connector_->enableRetry();
 }
 
-void TcpClient::newConnection(int sockfd)
+void TcpClient::onNewConnection(const TcpConnectionPtr& conn)
+{
+	if (conn->connected())
+	{
+		connectionCallback_(conn, "Connection established");
+	}
+	else
+	{
+		connectionCallback_(conn, "Connection closed");
+	}
+}
+
+void TcpClient::newConnection(int sockfd, int sockErr, int otherErr)
 {
 	loop_->assertInLoopThread();
-	if (-1 != sockfd)
+	if (sockfd > 0)
 	{
 		InetAddress peerAddr(sockets::getPeerAddr(sockfd));
-		/*
-		char buf[32];
-		snprintf(buf, sizeof buf, ":%s#%d", peerAddr.toIpPort().c_str(), nextConnId_);
-		string connName = name_ + buf;
-		*/
 		InetAddress localAddr(sockets::getLocalAddr(sockfd));
 		// FIXME poll with zero timeout to double confirm the new connection
 		// FIXME use make_shared if necessary
@@ -162,12 +145,10 @@ void TcpClient::newConnection(int sockfd)
 			m_nMaxRecvBuf,
 			m_nMaxSendQue));
 
-		++nextConnId_;
-
-		conn->setConnectionCallback(connectionCallback_);
+		conn->tie(shared_from_this());
+		conn->setConnectionCallback(std::bind(&TcpClient::onNewConnection, this, _1));
 		conn->setMessageCallback(messageCallback_);
 		conn->setWriteCompleteCallback(writeCompleteCallback_);
-
 		conn->setCloseCallback(std::bind(&TcpClient::removeConnection, this, _1)); // FIXME: unsafe
 		{
 			MutexLockGuard lock(mutex_);
@@ -177,8 +158,28 @@ void TcpClient::newConnection(int sockfd)
 	}
 	else
 	{
-		TcpConnectionPtr conn(nullptr);
-		connectionCallback_(conn);
+		std::string strErrDesc = "Other error";
+		if (sockErr != 0)
+		{
+			strErrDesc = strerror_tl(sockErr);
+		}
+		else if (1 == otherErr)
+		{
+			strErrDesc = "Connect timeout";
+		}
+		else if (2 == otherErr)
+		{
+			strErrDesc = "Tcp self connection occurs";
+		}
+		else if (3 == otherErr)
+		{
+			strErrDesc = "Connect aborted manually";
+		}
+		else
+		{
+			strErrDesc = "Other error";
+		}
+		connectionCallback_(nullptr, strErrDesc);
 	}
 }
 
@@ -187,6 +188,7 @@ void TcpClient::removeConnection(const TcpConnectionPtr& conn)
 	loop_->assertInLoopThread();
 	assert(loop_ == conn->getLoop());
 
+	if (connection_)
 	{
 		MutexLockGuard lock(mutex_);
 		assert(connection_ == conn);
@@ -196,3 +198,4 @@ void TcpClient::removeConnection(const TcpConnectionPtr& conn)
 	loop_->queueInLoop(std::bind(&TcpConnection::connectDestroyed, conn));
 }
 
+// connection_析构了以后TcpClient才会析构,因为每个Connection建立后都tie了TcpClient的指针

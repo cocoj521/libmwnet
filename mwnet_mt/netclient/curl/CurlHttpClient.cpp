@@ -202,27 +202,27 @@ curl_easy_perform()
 */
 void HttpResponse::GetTimeConsuming(uint32_t& total, uint32_t& connect, uint32_t& namelookup) const
 {
-	total 		= total_time_;
-	connect 	= connect_time_;
-	namelookup 	= namelookup_time_;
+	total		= total_time_ / 1000;
+	connect		= connect_time_ / 1000;
+	namelookup	= namelookup_time_ / 1000;
 }
 
 //获取回应对应的请求整体耗时
 uint32_t HttpResponse::GetReqTotalConsuming() const
 {
-	return total_time_;
+	return total_time_ / 1000;
 }
 
 //获取回应对应的请求连接耗时
 uint32_t HttpResponse::GetReqConnectConsuming() const
 {
-	return connect_time_;
+	return connect_time_ / 1000;
 }
 
 //获取回应对应的请求域名解析耗时
 uint32_t HttpResponse::GetReqNameloopupConsuming() const
 {
-	return namelookup_time_;
+	return namelookup_time_ / 1000;
 }
 
 //获取回应返回的时间
@@ -279,7 +279,7 @@ CurlHttpClient::CurlHttpClient() :
 {
 	total_req_ = 0;
 	// 申请一个线程将loop跑在线程里
-	EventLoopThreadPtr pLoopThr(new EventLoopThread(NULL, "mainloop"));
+	EventLoopThreadPtr pLoopThr(new EventLoopThread(NULL, "mHttpCliMain"));
 	EventLoop* pLoop = pLoopThr->startLoop();
 	if (pLoop)
 	{
@@ -292,7 +292,6 @@ CurlHttpClient::CurlHttpClient() :
 
 CurlHttpClient::~CurlHttpClient()
 {
-	ExitHttpClient();
 	CurlManager::uninitialize();
 }
 
@@ -369,7 +368,7 @@ bool CurlHttpClient::InitHttpClient(void* pInvoker,
 	{
 		EventLoop* pMainLoop = main_loop->getloop();
 		// 创建并启动IO线程
-		std::shared_ptr<EventLoopThreadPool> io_loop(new EventLoopThreadPool(pMainLoop, "ioloop"));
+		std::shared_ptr<EventLoopThreadPool> io_loop(new EventLoopThreadPool(pMainLoop, "mHttpCliIo"));
 		io_loop->setThreadNum(nIoThrNum);
 		// 保存io_loop
 		io_loop_ = io_loop;
@@ -429,10 +428,11 @@ HttpRequestPtr CurlHttpClient::GetHttpRequest(const std::string& strUrl, HTTP_VE
 int  CurlHttpClient::SendHttpRequest(const HttpRequestPtr& request, const boost::any& params, bool WaitORreturnIfOverMaxTotalConns)
 {
 	int nRet = 1;
+
+	int n = (++wait_rsp_ - MaxTotalConns_);
+
 	if (!exit_)
 	{
-		int n = (++wait_rsp_ - MaxTotalConns_);
-
 		std::shared_ptr<CountDownLatch> latchPtr(boost::any_cast<std::shared_ptr<CountDownLatch>>(latch_));
 
 		if (n > 0 && WaitORreturnIfOverMaxTotalConns) 
@@ -466,6 +466,10 @@ int  CurlHttpClient::SendHttpRequest(const HttpRequestPtr& request, const boost:
 			--wait_rsp_;
 		}
 	}
+	else
+	{
+		--wait_rsp_;
+	}
 	return nRet;
 }
 
@@ -492,38 +496,29 @@ int  CurlHttpClient::GetWaitReqCnt() const
 
 void CurlHttpClient::ExitHttpClient()
 {
-	LOG_INFO << "CurlHttpClient::ExitHttpClient";
-
 	if (!exit_)
 	{
 		// 置退出标记
 		exit_ = true;
-		// 将所有未回调的请求全部回调
-		HttpRequesting::GetInstance().clear();
-		HttpRecycleRequest::GetInstance().clear();
-		HttpWaitRequest::GetInstance().clear();
-		// 退出每一个curlmanager
-		//????.......确保curlmanager的loop中没有数据了再退出
-		std::vector<boost::any>::iterator it = httpclis_.begin();
-		for (; it != httpclis_.end(); ++it)
+		// 最多等多少次
+		int maxWaitCnt = 30;
+		while (GetWaitRspCnt() > 0)
 		{
-			std::shared_ptr<CurlManager> curlm = boost::any_cast<std::shared_ptr<CurlManager>>(*it);
-			// 最多等多少次
-			int maxWaitCnt = 50;
-			while (curlm->isLoopRunning()) 
+			// 将所有未回调的请求全部回调
+			HttpWaitRequest::GetInstance().clear();
+			HttpRequesting::GetInstance().clear();
+			HttpRecycleRequest::GetInstance().clear();
+
+			LOG_INFO << "CurlHttpClient::ExitHttpClient WaitRspCnt:" << GetWaitRspCnt();
+
+			if (--maxWaitCnt <= 0)
 			{
-				usleep(1000*100);
-				if (--maxWaitCnt <= 0) 
-				{
-					break;
-				}
+				break;
 			}
+			usleep(1000 * 100);
 		}
-		// 退出ioloop,将boost::any置空，自动析构ioloop
-		// 暂不强制析构io_loop,下次init时会自动析构,若析构curlhttpclient会自动析构
-		//boost::any _any;
-		//io_loop_ = _any;
 	}
+	LOG_INFO << "CurlHttpClient::ExitHttpClient";
 }
 
 }

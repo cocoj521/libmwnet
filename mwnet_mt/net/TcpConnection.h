@@ -112,6 +112,9 @@ class TcpConnection : noncopyable,
   
   const string& getHexWeakPtrValue() const { return strweakptr_; }
   
+  void tie(const boost::any& _tie)
+  { tie_ = _tie; }
+
   void setContext(const boost::any& context)
   { context_ = context; }
 
@@ -159,15 +162,6 @@ class TcpConnection : noncopyable,
 
   void setHighWaterMark(size_t highWaterMark)
   { highWaterMark_ = highWaterMark; }
-  
-/*
-  /// Advanced interface
-  Buffer* inputBuffer()
-  { return &inputBuffer_; }
-
-  Buffer* outputBuffer()
-  { return &outputBuffer_; }
-*/
 
   /// Internal use only.
   void setCloseCallback(const CloseCallback& cb)
@@ -229,13 +223,11 @@ private:
   Buffer inputBuffer_;
   std::list<OUTBUFFER_PTR> outputBufferList_;
   size_t sendQueSize_;
-  //Buffer outputBuffer_; // FIXME: use list<Buffer> as output buffer.
   boost::any context_;
   boost::any exinfo_;
   boost::any session_;	//store shared_ptr will be better
   TimerId suspendReadTimer_;
-  // FIXME: creationTime_, lastReceiveTime_
-  //        bytesReceived_, bytesSent_
+  boost::any tie_;
 };
 
 typedef std::shared_ptr<TcpConnection> TcpConnectionPtr;

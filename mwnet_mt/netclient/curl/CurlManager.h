@@ -49,7 +49,9 @@ public:
 
 	// 处理中断请求
 	void forceCancelRequest(uint64_t req_uuid);
-	
+	// 处理中断请求(内部调用)
+	void forceCancelRequestInner(const CurlRequestPtr& request);
+
 	/**
 	 * [读事件的响应函数]
 	 * @param fd [事件的套接口]
@@ -63,7 +65,7 @@ public:
 	void onWriteEventCallBack(int fd);
 
 	// 判断事件循环中是否还有未完成事件
-	bool isLoopRunning();
+	size_t isLoopRunning();
 private:
 	// 通知发送
 	void notifySendRequest();

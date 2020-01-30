@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include <mwnet_mt/net/EventLoop.h>
 #include <mwnet_mt/net/TimerId.h>
+#include <mwnet_mt/base/Timestamp.h>
 
 extern "C"
 {
@@ -57,6 +58,8 @@ public:
 
 	// 强制取消请求
 	void forceCancel();
+	// 强制取消请求(内部调用)
+	void forceCancelInner();
 
 	/**
 	 * 从multi中移除
@@ -182,14 +185,6 @@ public:
 	 * @return [curl_指针]
 	 */
 	CURL* getCurl() { return curl_; }
-
-	static uint64_t now()
-	{
-		struct timeval tv;
-		gettimeofday(&tv, NULL);
-		int64_t seconds = tv.tv_sec;
-		return (seconds * 1000 * 1000 + tv.tv_usec);
-	}
 	
 private:
 
@@ -200,7 +195,6 @@ private:
 	// 清理curl句柄
 	void cleanCurlHandles();
 
-	
 	/**
 	 * [包体回调函数，供内部使用]
 	 * @param buffer [需要处理的字符串首地址]

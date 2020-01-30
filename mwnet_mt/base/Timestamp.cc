@@ -55,3 +55,16 @@ Timestamp Timestamp::now()
   return Timestamp(seconds * kMicroSecondsPerSecond + tv.tv_usec);
 }
 
+int64_t Timestamp::GetCurrentTimeMs()
+{
+	struct timeval now_time;
+	gettimeofday(&now_time, NULL);
+	return (now_time.tv_sec * 1000 + now_time.tv_usec / 1000);
+}
+
+int64_t Timestamp::GetCurrentTimeUs()
+{
+	struct timeval now_time;
+	gettimeofday(&now_time, NULL);
+	return (now_time.tv_sec * 1000 * 1000 + now_time.tv_usec);
+}

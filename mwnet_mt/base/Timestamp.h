@@ -71,7 +71,8 @@ class Timestamp : public mwnet_mt::copyable,
   {
     return Timestamp(static_cast<int64_t>(t) * kMicroSecondsPerSecond + microseconds);
   }
-
+  static int64_t GetCurrentTimeMs();
+  static int64_t GetCurrentTimeUs();
   static const int kMicroSecondsPerSecond = 1000 * 1000;
 
  private:

@@ -227,6 +227,13 @@ void CurlRequest::forceCancel()
 	loop_->queueInLoop(std::bind(&CurlManager::forceCancelRequest, cm_, req_uuid_));
 }
 
+// 强制取消请求(内部调用)
+void CurlRequest::forceCancelInner()
+{
+	LOG_DEBUG << "CurlRequest::forceCancelInner " << req_uuid_;
+	loop_->queueInLoop(std::bind(&CurlManager::forceCancelRequestInner, cm_, shared_from_this()));
+}
+
 void CurlRequest::request(CurlManager* cm, CURLM* multi, EventLoop* loop)
 {
 	// 将头部信息加入curl
@@ -238,7 +245,7 @@ void CurlRequest::request(CurlManager* cm, CURLM* multi, EventLoop* loop)
 	// 管理器的loop
 	loop_ = loop;
 
-	req_time_ = CurlRequest::now();
+	req_time_ = Timestamp::GetCurrentTimeUs();
 	
 	// 加入事件管理器中，响应事件
 	curl_multi_add_handle(multi, curl_);
@@ -344,7 +351,7 @@ std::string CurlRequest::getResponseContentType()
 void CurlRequest::done(int errCode, const char* errDesc)
 {
 	LOG_DEBUG << "CurlRequest::done";
-	rsp_time_ = CurlRequest::now();
+	rsp_time_ = Timestamp::GetCurrentTimeUs();
 	
 	double total_time;
 	curl_easy_getinfo(curl_, CURLINFO_TOTAL_TIME, &total_time);
