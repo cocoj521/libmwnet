@@ -85,6 +85,9 @@ void CurlRequest::initCurlRequest(const std::string& url, uint64_t req_uuid, boo
 	// Ä¬ÈÏuser-agent
 	curl_easy_setopt(curl_, CURLOPT_USERAGENT, curl_version());
 
+	//¹Ø±ÕExpect: 100-continue
+	setHeaders("Expect", "");
+
 	// Connection: Keep-Alive/Close
 	setHeaders("Connection", keep_alive_?"Keep-Alive":"Close");
 
