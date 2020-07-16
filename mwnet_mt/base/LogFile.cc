@@ -93,6 +93,32 @@ void LogFile::append_unlocked(const char* logline, size_t len)
   }
 }
 
+//创建多级目录
+bool mkdirs(const std::string& filename, mode_t mode)
+{
+	bool ret = false;
+
+	//循环创建
+	size_t pos = 0;
+	while ((pos = filename.find('/', pos)) != std::string::npos)
+	{
+		std::string dir = filename.substr(0, pos);
+		if (!dir.empty() && dir != ".")
+		{
+			//不存在则创建
+			if (0 != access(dir.c_str(), R_OK) && 0 != mkdir(dir.c_str(), mode))
+			{
+				//创建失败
+				ret = false;
+				break;
+			}
+		}
+		++pos;
+	}
+
+	return ret;
+}
+
 bool LogFile::rollFile()
 {
   time_t now = time(NULL);  
@@ -110,8 +136,10 @@ bool LogFile::rollFile()
     std::size_t pos = filename.find_last_of('/');
     if (pos != string::npos)
     {
-      createDir = filename.substr(0, pos);
-      mkdir(createDir.c_str(), 0755);
+	  //printf("%s\n", filename.c_str());
+      //createDir = filename.substr(0, pos);
+      //mkdir(createDir.c_str(), 0755);
+		mkdirs(filename.c_str(), 0755);
     }
     // std::cout << "filename = " << filename << ", createDir = " << createDir << std::endl;
     // sleep(5);

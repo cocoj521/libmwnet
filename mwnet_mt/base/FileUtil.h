@@ -83,4 +83,3 @@ class AppendFile : noncopyable
 }
 
 #endif  // MWNET_MT_BASE_FILEUTIL_H
-

@@ -3,6 +3,7 @@
 
 #include <mwnet_mt/base/LogStream.h>
 #include <mwnet_mt/base/Timestamp.h>
+#include <functional>
 
 namespace mwnet_mt
 {
@@ -65,10 +66,12 @@ class Logger
   static LogLevel logLevel();
   static void setLogLevel(LogLevel level);
 
+  typedef std::function<void(const char* msg, size_t len)> LogOutputCallback;
+  typedef std::function<void()> LogFlushCallback;
   typedef void (*OutputFunc)(const char* msg, size_t len);
   typedef void (*FlushFunc)();
-  static void setOutput(OutputFunc);
-  static void setFlush(FlushFunc);
+  static void setOutput(const LogOutputCallback& cb);
+  static void setFlush(const LogFlushCallback& cb);
   static void setTimeZone(const TimeZone& tz);
 
  private:

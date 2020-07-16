@@ -206,6 +206,33 @@ const char* g_module_logs[] =
 "download"
 };
 */
+//日志
+//..........................................................
+class NetServerLog
+{
+public:
+	NetServerLog(){}
+public:
+	void init()
+	{
+		mkdir("./netlogs", 0755);
+		if (!logFile_) logFile_.reset(new mwnet_mt::LogFile("./netlogs/", "netserverlog", 1024 * 1024 * 100, true, 0, 1));
+		mwnet_mt::Logger::setOutput(std::bind(&NetServerLog::outputFunc, this, _1, _2));
+		mwnet_mt::Logger::setFlush(std::bind(&NetServerLog::flushFunc, this));
+	}
+	void outputFunc(const char* msg, size_t len)
+	{
+		logFile_->append(msg, len);
+	}
+	void flushFunc()
+	{
+		logFile_->flush();
+	}
+private:
+	std::unique_ptr<mwnet_mt::LogFile> logFile_;
+};
+
+//........................................................
 typedef struct _net_ctrl_params
 {
 	//-----------------------------------------------------------
@@ -240,6 +267,7 @@ typedef struct _net_ctrl_params
 
 	bool g_bExit_http;							//http服务退出标志
 	bool g_bExit_tcp;							//http服务退出标志
+	NetServerLog g_log;
 }net_ctrl_params;
 
 typedef std::shared_ptr<net_ctrl_params> net_ctrl_params_ptr;
@@ -256,21 +284,6 @@ struct tInnerParams
 };
 
 //-----------------------------------------------------------
-
-//日志
-//..........................................................
-std::unique_ptr<mwnet_mt::LogFile> g_logFile;
-
-void outputFunc(const char* msg, size_t len)
-{
-  g_logFile->append(msg, len);
-}
-
-void flushFunc()
-{
-  g_logFile->flush();
-}
-//........................................................
 //首位预留,永远正数,可以最大支持8000个结点,每个结点1秒最大生成16777215个不重复的ID,仅保证1年内不重复.
 uint64_t MakeSnowId(uint16_t unique_node_id, AtomicInt64& nSequnceId)
 {
@@ -2604,13 +2617,7 @@ m_NetServerCtrl(new NetServerCtrlInfo())
 	net_ctrl_params_ptr  ptrParams = m_NetServerCtrl->m_ptrCtrlParams;
 
 	ptrParams->g_unique_node_id = unique_node_id;
-
-	//暂时取消
-	mkdir("./netlogs", 0755);
-	if (!g_logFile) g_logFile.reset(new mwnet_mt::LogFile("./netlogs/", "netserverlog", 1024*1024*100, true, 0, 1));
-  	mwnet_mt::Logger::setOutput(outputFunc);
-  	mwnet_mt::Logger::setFlush(flushFunc);
-
+	ptrParams->g_log.init();
 	//默认启用日志
 	ptrParams->g_bEnableRecvLog_http = true;
 	ptrParams->g_bEnableSendLog_http = true;
@@ -2635,13 +2642,7 @@ m_NetServerCtrl(new NetServerCtrlInfo())
 {
 	net_ctrl_params_ptr  ptrParams = m_NetServerCtrl->m_ptrCtrlParams;
 	ptrParams->g_unique_node_id = 0;
-
-	//暂时取消
-	mkdir("./netlogs", 0755);
-	if (!g_logFile) g_logFile.reset(new mwnet_mt::LogFile("./netlogs/", "netserverlog", 1024*1024*100, true, 0, 1));
-  	mwnet_mt::Logger::setOutput(outputFunc);
-  	mwnet_mt::Logger::setFlush(flushFunc);
-
+	ptrParams->g_log.init();
 	//默认启用日志
 	ptrParams->g_bEnableRecvLog_http = true;
 	ptrParams->g_bEnableSendLog_http = true;

@@ -83,8 +83,10 @@ void defaultFlush()
   fflush(stdout);
 }
 
-Logger::OutputFunc g_output = defaultOutput;
-Logger::FlushFunc g_flush = defaultFlush;
+Logger::LogOutputCallback g_output = defaultOutput;
+Logger::LogFlushCallback g_flush = defaultFlush;
+//Logger::OutputFunc g_output = defaultOutput;
+//Logger::FlushFunc g_flush = defaultFlush;
 TimeZone g_logTimeZone;
 
 }
@@ -212,14 +214,14 @@ void Logger::setLogLevel(Logger::LogLevel level)
   g_logLevel = level;
 }
 
-void Logger::setOutput(OutputFunc out)
+void Logger::setOutput(const LogOutputCallback& cb)
 {
-  g_output = out;
+  g_output = cb;
 }
 
-void Logger::setFlush(FlushFunc flush)
+void Logger::setFlush(const LogFlushCallback& cb)
 {
-  g_flush = flush;
+  g_flush = cb;
 }
 
 void Logger::setTimeZone(const TimeZone& tz)
