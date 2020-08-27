@@ -9,6 +9,9 @@
 #include <mwnet_mt/net/EventLoopThread.h>
 #include <mwnet_mt/net/EventLoopThreadPool.h>
 
+#ifdef LIB_VERSION
+const char *pVer = LIB_VERSION;
+#endif
 
 using namespace mwnet_mt;
 using namespace mwnet_mt::net;

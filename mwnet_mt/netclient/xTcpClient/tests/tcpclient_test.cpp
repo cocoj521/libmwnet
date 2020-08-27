@@ -27,7 +27,7 @@ int func_on_connection(void* pInvoker, const ConnBaseInfoPtr& pConnBaseInfo, boo
 		pConnBaseInfo->conn_status_desc.c_str());
 	if (bConnected)
 	{
-		client->SendMsgWithTcpClient(pConnBaseInfo, bConnected, "POST", 4, 3);
+		client->SendMsgWithTcpClient(pConnBaseInfo, bConnected, "test", 4, 3);
 	}
 	else
 	{
@@ -89,8 +89,8 @@ int main(int argc, char* argv[])
 			ConnBaseInfoPtr pConnInfo(new connection_baseinfo_t());
 			//pConnInfo->conn_ip = "175.25.22.9";
 			//pConnInfo->conn_port = 9003;
-			pConnInfo->conn_ip = "192.169.0.231";
-			pConnInfo->conn_port = 7890;
+			pConnInfo->conn_ip = "www.baidu.com";
+			pConnInfo->conn_port = 80;
 			pConnInfo->conn_timeout = 5;
 			pConnInfo->any_data = 1;
 

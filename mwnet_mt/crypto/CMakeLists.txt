@@ -53,6 +53,7 @@ set(crypto_SRCS
 #    version.c
 #    version_features.c
 #    xtea.c
+     Version.cc
 )
 
 if(NOT CMAKE_BUILD_DYNAMIC_LIB)

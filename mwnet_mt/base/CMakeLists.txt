@@ -13,6 +13,7 @@ set(base_SRCS
   TimeZone.cc
   Thread.cc
   ThreadPool.cc
+  Version.cc
   )
 
 if(NOT CMAKE_BUILD_DYNAMIC_LIB)

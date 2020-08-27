@@ -7,6 +7,7 @@ set(curl_SRCS
 	CurlEvMgr.cpp
 	RequestManager.cpp
 	CurlHttpClient.cpp
+	Version.cc
   )
 
 if(NOT CMAKE_BUILD_DYNAMIC_LIB)

@@ -8,6 +8,7 @@ set(util_SRCS
 	MWTimestamp.cc
 	MWCountDownLatch.cc
 	MWStringUtil.cc
+	Version.cc
   )
 
 if(NOT CMAKE_BUILD_DYNAMIC_LIB)

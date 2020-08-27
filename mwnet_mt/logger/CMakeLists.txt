@@ -12,6 +12,7 @@ set(logger_SRCS
 	../base/LogFile.cc
 	../base/AsyncLogging.cc
 	./MWLogger.cc
+	Version.cc
   )
 
 if(NOT CMAKE_BUILD_DYNAMIC_LIB)

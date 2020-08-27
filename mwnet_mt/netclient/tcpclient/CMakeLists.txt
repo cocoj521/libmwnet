@@ -1,5 +1,6 @@
 set(tcpclient_SRCS
 	TcpClient.cc
+	Version.cc
    )
 
 if(NOT CMAKE_BUILD_DYNAMIC_LIB)

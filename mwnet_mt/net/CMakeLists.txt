@@ -27,6 +27,7 @@ set(net_SRCS
   TcpServer.cc
   Timer.cc
   TimerQueue.cc
+  Version.cc
   )
 
 if(NOT CMAKE_BUILD_DYNAMIC_LIB)
