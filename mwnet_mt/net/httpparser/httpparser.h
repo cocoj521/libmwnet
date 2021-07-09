@@ -327,6 +327,7 @@ public:
 	//返回值:CONTENT_TYPE_XML 代表 xml,CONTENT_TYPE_JSON 代表 json,CONTENT_TYPE_URLENCODE 代表 urlencode,CONTENT_TYPE_UNKNOWN 代表 未知类型
 	//说明:暂只提供这三种
 	int		get_http_content_type();
+	std::string		get_http_content_type_str();
 
 	//获取host
 	//返回值:host的指针,以及长度

@@ -428,7 +428,7 @@ HttpRequestPtr CurlHttpClient::GetHttpRequest(const std::string& strUrl, HTTP_VE
 }
 
 //∑¢ÀÕhttp«Î«Û
-int  CurlHttpClient::SendHttpRequest(const HttpRequestPtr& request, const boost::any& params, bool WaitORreturnIfOverMaxTotalConns)
+int  CurlHttpClient::SendHttpRequest(const HttpRequestPtr& request, const boost::any& params, bool WaitOrReturnIfOverMaxTotalConns)
 {
 	int nRet = 1;
 
@@ -438,7 +438,7 @@ int  CurlHttpClient::SendHttpRequest(const HttpRequestPtr& request, const boost:
 	{
 		std::shared_ptr<CountDownLatch> latchPtr(boost::any_cast<std::shared_ptr<CountDownLatch>>(latch_));
 
-		if (n > 0 && WaitORreturnIfOverMaxTotalConns) 
+		if (n > 0 && WaitOrReturnIfOverMaxTotalConns)
 		{
 			latchPtr->addAndWait(n);
 		}

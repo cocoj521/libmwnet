@@ -213,7 +213,7 @@ public:
 	//0:成功 1:尚未初始化 2:发送队列满(超过了nMaxReqQueSize) 3:超过总的最大并发数(超过了nMaxTotalConns) 
 	int  SendHttpRequest(const HttpRequestPtr& request,	 /*完整的http请求数据,每次请求前调用GetHttpRequest获取,然后并填充所需参数*/
 						const boost::any& params,		 /*每次请求可携带一个任意数据,回调返回时会返回,建议填写智能指针*/
-						bool WaitORreturnIfOverMaxTotalConns=false); /*超过总的最大并发数后，选择阻塞等待还是直接返回失败*/ 
+						bool WaitOrReturnIfOverMaxTotalConns=false); /*超过总的最大并发数后，选择阻塞等待还是直接返回失败*/ 
 																	 /*false:直接失败 true:阻塞等待并发减少后再发送*/	 
 	
 	// 取消请求，当请求未发送或已发送但还没回应时有效，会通过回调函数返回

@@ -287,7 +287,7 @@ namespace mw_http_parser
 			m_pUrl = (char*)at;
     	}
 		m_nUrlLen += length;
-		printf("handleUrl-%s,%ld\r\n", m_pUrl, length);
+		//printf("handleUrl-%s,%ld\r\n", m_pUrl, length);
         return 0;
     }
 
@@ -616,7 +616,7 @@ namespace mw_http_parser
 #pragma GCC diagnostic error "-Wconversion"
 
 		m_bParseOver = true;
-		printf("handleMessageComplete-%s,%ld\r\n", m_pUrl, m_nUrlLen);
+		//printf("handleMessageComplete-%s,%ld\r\n", m_pUrl, m_nUrlLen);
         return onMessageComplete();
     }
 
@@ -883,6 +883,16 @@ namespace mw_http_parser
 	int HttpParser::get_http_content_type()
 	{
 		return m_nContentType;
+	}
+	std::string	HttpParser::get_http_content_type_str()
+	{
+		std::string strContentType = "";
+		if (m_pContentType != NULL && m_nContentTypeLen > 0)
+		{
+			strContentType.assign(m_pContentType, m_nContentTypeLen);
+		}
+		
+		return strContentType;
 	}
 	int HttpParser::parse_content_type()
 	{

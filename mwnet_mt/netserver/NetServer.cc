@@ -895,6 +895,15 @@ int HttpRequest::GetContentType() const
 	}
 	return CONTENT_TYPE_UNKNOWN;
 }
+std::string HttpRequest::GetContentTypeStr()
+{
+	HttpParser* psr = reinterpret_cast<HttpParser*>(p);
+	if (psr)
+	{
+		return psr->get_http_content_type_str();
+	}
+	return "";
+}
 
 // 获取host
 // 返回值:host的内容以及长度
