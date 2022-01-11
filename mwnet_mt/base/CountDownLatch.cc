@@ -33,6 +33,18 @@ void CountDownLatch::addAndWait(int count)
 	}
 }
 
+void CountDownLatch::waitThenAdd(int count)
+{
+	MutexLockGuard lock(mutex_);
+
+	while (count_ > 0)
+	{
+		condition_.wait();
+	}
+
+	count_ += count;
+}
+
 void CountDownLatch::resetCount(int count)
 {
 	count_ = count;

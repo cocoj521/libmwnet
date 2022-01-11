@@ -26,6 +26,17 @@ void CountDownLatch::AddAndWait(int nAdd)
 	}
 }
 
+// 先等待,等到后增加次数
+void CountDownLatch::WaitThenAdd(int nAdd)
+{
+	CountDownLatchPtr pCntDownLatch(boost::any_cast<CountDownLatchPtr>(m_any));
+
+	if (pCntDownLatch)
+	{
+		pCntDownLatch->waitThenAdd(nAdd);
+	}
+}
+
 // 重置次数，仅限于所有次数归0后才能重置
 void CountDownLatch::ResetCount(int nCount)
 {

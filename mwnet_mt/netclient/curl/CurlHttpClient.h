@@ -211,6 +211,7 @@ public:
 
 	//发送http请求
 	//0:成功 1:尚未初始化 2:发送队列满(超过了nMaxReqQueSize) 3:超过总的最大并发数(超过了nMaxTotalConns) 
+	//!!!注意:调用该接口的线程数必须小于InitHttpClient接口中nMaxTotalConns的值,否则可能分出现永久阻塞
 	int  SendHttpRequest(const HttpRequestPtr& request,	 /*完整的http请求数据,每次请求前调用GetHttpRequest获取,然后并填充所需参数*/
 						const boost::any& params,		 /*每次请求可携带一个任意数据,回调返回时会返回,建议填写智能指针*/
 						bool WaitOrReturnIfOverMaxTotalConns=false); /*超过总的最大并发数后，选择阻塞等待还是直接返回失败*/ 
@@ -220,10 +221,10 @@ public:
 	void CancelHttpRequest(const HttpRequestPtr& request);
 
 	// 获取待回应数量
-	int  GetWaitRspCnt() const;
+	size_t  GetWaitRspCnt() const;
 
 	// 获取待发请求数量
-	int  GetWaitReqCnt() const;
+	size_t  GetWaitReqCnt() const;
 
 	// 退出
 	void ExitHttpClient();
@@ -240,6 +241,10 @@ private:
 	boost::any io_loop_;
 	// latch
 	boost::any latch_;
+	// condition
+	boost::any condition_;
+	// mutex
+	boost::any mutexLock_;
 	// httpclis
 	std::vector<boost::any> httpclis_;
 	// 总请求数

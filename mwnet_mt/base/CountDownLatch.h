@@ -20,6 +20,8 @@ class CountDownLatch : noncopyable
 
   void addAndWait(int count);
 
+  void waitThenAdd(int count);
+
   // 仅当计数归0后才能重设
   void resetCount(int count);
   

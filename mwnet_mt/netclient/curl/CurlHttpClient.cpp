@@ -5,6 +5,7 @@
 #include <mwnet_mt/base/LogFile.h>
 #include <mwnet_mt/base/Logging.h>
 #include <mwnet_mt/base/CountDownLatch.h>
+#include <mwnet_mt/base/Condition.h>
 #include <mwnet_mt/net/EventLoop.h>
 #include <mwnet_mt/net/EventLoopThread.h>
 #include <mwnet_mt/net/EventLoopThreadPool.h>
@@ -326,8 +327,8 @@ void CurlHttpClient::DoneCallBack(const boost::any& _any, int errCode, const cha
 	}
 	
 	--wait_rsp_;
-	std::shared_ptr<CountDownLatch> latchPtr(boost::any_cast<std::shared_ptr<CountDownLatch>>(latch_));
-	latchPtr->countDown();
+	std::shared_ptr<Condition> conditionPtr(boost::any_cast<std::shared_ptr<Condition>>(condition_));
+	conditionPtr->notifyAll();
 	
 	time_t tNow = time(NULL);
 	static time_t tLast = time(NULL);
@@ -378,7 +379,11 @@ bool CurlHttpClient::InitHttpClient(void* pInvoker,
 		
 		std::shared_ptr<CountDownLatch> latchPtr(new CountDownLatch(nIoThrNum));
 		latch_ = latchPtr;
-		
+		std::shared_ptr<MutexLock> mutexPtr(new MutexLock());
+		mutexLock_ = mutexPtr;
+		std::shared_ptr<Condition> conditionPtr(new Condition(*mutexPtr));
+		condition_ = conditionPtr;
+
 		pMainLoop->runInLoop(std::bind(&CurlHttpClient::Start, this));
 
 		latchPtr->wait();
@@ -432,16 +437,15 @@ int  CurlHttpClient::SendHttpRequest(const HttpRequestPtr& request, const boost:
 {
 	int nRet = 1;
 
-	int n = (++wait_rsp_ - MaxTotalConns_);
-
 	if (!exit_)
 	{
-		std::shared_ptr<CountDownLatch> latchPtr(boost::any_cast<std::shared_ptr<CountDownLatch>>(latch_));
-
-		if (n > 0 && WaitOrReturnIfOverMaxTotalConns)
+		std::shared_ptr<Condition> conditionPtr(boost::any_cast<std::shared_ptr<Condition>>(condition_));
+		//无可用连接则等待
+		while (wait_rsp_.load() - MaxTotalConns_ >= 0)
 		{
-			latchPtr->addAndWait(n);
+			if (WaitOrReturnIfOverMaxTotalConns) conditionPtr->wait();
 		}
+		++wait_rsp_;
 		
 		// 取发送中队列未满的管理器
 		uint64_t count = total_req_.load();
@@ -469,10 +473,7 @@ int  CurlHttpClient::SendHttpRequest(const HttpRequestPtr& request, const boost:
 			--wait_rsp_;
 		}
 	}
-	else
-	{
-		--wait_rsp_;
-	}
+
 	return nRet;
 }
 
@@ -486,15 +487,22 @@ void CurlHttpClient::CancelHttpRequest(const HttpRequestPtr& request)
 }
 
 // 获取待回应数量
-int  CurlHttpClient::GetWaitRspCnt() const
+size_t  CurlHttpClient::GetWaitRspCnt() const
 {
 	return wait_rsp_.load();
 }
 
 // 获取待发请求数量
-int  CurlHttpClient::GetWaitReqCnt() const
+size_t  CurlHttpClient::GetWaitReqCnt() const
 {
-	return HttpWaitRequest::GetInstance().size();
+	boost::any _any = httpclis_[0];
+	size_t tCnt = 0;
+	if (!_any.empty())
+	{
+		std::shared_ptr<CurlManager> curlm = boost::any_cast<std::shared_ptr<CurlManager>>(_any);
+		tCnt = curlm->loopSize();
+	}
+	return HttpWaitRequest::GetInstance().size() + tCnt;
 }
 
 void CurlHttpClient::ExitHttpClient()

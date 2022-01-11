@@ -66,6 +66,8 @@ public:
 
 	// 判断事件循环中是否还有未完成事件
 	size_t isLoopRunning();
+
+	size_t loopSize() { return loop_->queueSize(); };
 private:
 	// 通知发送
 	void notifySendRequest();

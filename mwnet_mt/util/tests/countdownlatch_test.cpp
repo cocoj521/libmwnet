@@ -13,6 +13,7 @@ CountDownLatch countDownLatch(THREAD_NUM);
 void func_test()
 {
 	cout << "thread start id:" << this_thread::get_id() << endl;
+	sleep(1);
 	//¼ÆÊý-1
 	countDownLatch.CountDown();
 }

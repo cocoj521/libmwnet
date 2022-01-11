@@ -185,7 +185,7 @@ void EPollPoller::update(int operation, Channel* channel)
     }
     */
     //如果这里不成功，表示fd已无效，没必要纠结
-    LOG_SYSERR << "epoll_ctl op =" << operationToString(operation) << " fd =" << fd;
+    //LOG_SYSERR << "epoll_ctl op =" << operationToString(operation) << " fd =" << fd;
   }
 }
 

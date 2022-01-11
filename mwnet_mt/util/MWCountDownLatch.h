@@ -14,6 +14,9 @@ public:
 	// 增加次数，并等待
 	void AddAndWait(int nAdd);
 
+	// 先等待,等到后增加次数
+	void WaitThenAdd(int nAdd);
+
 	// 重置次数，仅限于所有次数归0后才能重置
 	void ResetCount(int nCount);
 
