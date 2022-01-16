@@ -495,6 +495,7 @@ size_t  CurlHttpClient::GetWaitRspCnt() const
 // 获取待发请求数量
 size_t  CurlHttpClient::GetWaitReqCnt() const
 {
+	/*
 	boost::any _any = httpclis_[0];
 	size_t tCnt = 0;
 	if (!_any.empty())
@@ -503,6 +504,8 @@ size_t  CurlHttpClient::GetWaitReqCnt() const
 		tCnt = curlm->loopSize();
 	}
 	return HttpWaitRequest::GetInstance().size() + tCnt;
+	*/
+	return HttpWaitRequest::GetInstance().size();
 }
 
 void CurlHttpClient::ExitHttpClient()
