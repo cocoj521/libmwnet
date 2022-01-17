@@ -30,7 +30,9 @@ void  CurlEvMgr::delEv(void* p)
 }
 
 // 生成新channel,并将fd与channel关联
-void* CurlEvMgr::addEvLoop(void* p, int fd, int what, const ReadEventCallback& read_cb, const EventCallback& write_cb)
+void* CurlEvMgr::addEvLoop(void* p, int fd, int what, 
+	const ReadEventCallback& read_cb, const EventCallback& write_cb,
+	const EventCallback& close_cb, const EventCallback& err_cb)
 {
 	Channel* ch = static_cast<Channel*>(p);
 	
@@ -40,10 +42,12 @@ void* CurlEvMgr::addEvLoop(void* p, int fd, int what, const ReadEventCallback& r
 	{
 		ch->tie(shared_from_this());
 		
-		// 设置读写回调函数
+		// 设置读/写/关闭/异常回调函数
 		ch->setReadCallback(read_cb);
 		ch->setWriteCallback(write_cb);
-	
+		//ch->setCloseCallback(close_cb);
+		//ch->setErrorCallback(err_cb);
+
 		// 标识通道可读（会响应POLL_IN事件）
 		ch->enableReading();
 		
@@ -66,7 +70,7 @@ void* CurlEvMgr::delEvLoop(void* p, int fd, int what)
 		ch->remove();
 
 		// 关闭socket
-		//closeFd(ch->fd());
+		closeFd(ch->fd());
 
 		// 释放通道指针
 		delete ch;

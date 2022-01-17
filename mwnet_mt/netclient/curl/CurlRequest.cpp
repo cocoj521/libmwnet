@@ -184,12 +184,15 @@ int CurlRequest::hookOpenSocket(void *clientp, curlsocktype purpose, struct curl
 
 int CurlRequest::hookCloseSocket(void *clientp, int fd)
 {
-	LOG_DEBUG << "CurlRequest::hookCloseSocket:" << fd;
+	return 0;
+
+	LOG_DEBUG << "CurlRequest::hookCloseSocket: fd:" << fd << " clientp:" << clientp;
 	//CurlRequest* p = static_cast<CurlRequest*>(clientp);
 	uint64_t req_uuid = reinterpret_cast<uint64_t>(clientp);
 	CurlRequestPtr p = HttpRequesting::GetInstance().find(req_uuid);
 	if (p)
 	{
+		LOG_DEBUG << "CurlRequest::hookCloseSocket: CurlRequestPtr:" << p.get();
 		p->fd_ = -1;
 		// ·ÅÈëloop, ¹Ø±Õsocket
 		p->loop_->queueInLoop(std::bind(closeFd, p, fd));
@@ -358,15 +361,15 @@ void CurlRequest::done(int errCode, const char* errDesc)
 	
 	double total_time;
 	curl_easy_getinfo(curl_, CURLINFO_TOTAL_TIME, &total_time);
-	LOG_DEBUG << "TOTAL TIME:" << total_time*1000000 << "us\n";
+	LOG_DEBUG << "TOTAL TIME:" << total_time*1000000 << "us";
 
 	double connect_time;
 	curl_easy_getinfo(curl_, CURLINFO_CONNECT_TIME, &connect_time);
-	LOG_DEBUG << "CONNECT TIME:" << connect_time*1000000 << "us\n";
+	LOG_DEBUG << "CONNECT TIME:" << connect_time*1000000 << "us";
 
 	double nameloopup_time;
 	curl_easy_getinfo(curl_, CURLINFO_NAMELOOKUP_TIME, &nameloopup_time);
-	LOG_DEBUG << "NAMELOOPUP TIME:" << nameloopup_time*1000000 << "us\n";
+	LOG_DEBUG << "NAMELOOPUP TIME:" << nameloopup_time*1000000 << "us";
 
 	total_time_ = static_cast<int>(total_time*1000000);
 	connect_time_ = static_cast<int>(connect_time*1000000);

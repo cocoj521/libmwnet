@@ -21,7 +21,11 @@ public:
 	void* getNewEv(int fd);
 	void  delEv(void* p);
 	// 生成新channel,并将fd与channel关联
-	void* addEvLoop(void* p, int fd, int what, const ReadEventCallback& read_cb, const EventCallback& write_cb);
+	void* addEvLoop(void* p, int fd, int what, 
+		const ReadEventCallback& read_cb, 
+		const EventCallback& write_cb,
+		const EventCallback& close_cb,
+		const EventCallback& err_cb);
 	void* delEvLoop(void* p, int fd, int what);
 	void  optEvLoop(void* p, int fd, int what);
 private:
