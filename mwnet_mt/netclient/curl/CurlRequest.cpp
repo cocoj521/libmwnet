@@ -196,8 +196,11 @@ int CurlRequest::hookCloseSocket(void *clientp, int fd)
 	if (p)
 	{
 <<<<<<< HEAD
+<<<<<<< HEAD
 		LOG_DEBUG << "CurlRequestPtr = " << p.get();
 =======
+=======
+>>>>>>> parent of 755b2ca (ä¼˜åŒ–curlHttpClient)
 		p->fd_ = -1;
 >>>>>>> parent of 755b2ca (ä¼˜åŒ–curlHttpClient)
 		// ·ÅÈëloop, ¹Ø±Õsocket
@@ -367,6 +370,7 @@ void CurlRequest::done(int errCode, const char* errDesc)
 	double total_time;
 	curl_easy_getinfo(curl_, CURLINFO_TOTAL_TIME, &total_time);
 <<<<<<< HEAD
+<<<<<<< HEAD
 	
 	double connect_time;
 	curl_easy_getinfo(curl_, CURLINFO_CONNECT_TIME, &connect_time);
@@ -374,6 +378,8 @@ void CurlRequest::done(int errCode, const char* errDesc)
 	double nameloopup_time;
 	curl_easy_getinfo(curl_, CURLINFO_NAMELOOKUP_TIME, &nameloopup_time);
 =======
+=======
+>>>>>>> parent of 755b2ca (ä¼˜åŒ–curlHttpClient)
 	LOG_DEBUG << "TOTAL TIME:" << total_time*1000000 << "us\n";
 
 	double connect_time;
@@ -383,6 +389,7 @@ void CurlRequest::done(int errCode, const char* errDesc)
 	double nameloopup_time;
 	curl_easy_getinfo(curl_, CURLINFO_NAMELOOKUP_TIME, &nameloopup_time);
 	LOG_DEBUG << "NAMELOOPUP TIME:" << nameloopup_time*1000000 << "us\n";
+<<<<<<< HEAD
 >>>>>>> parent of 755b2ca (ä¼˜åŒ–curlHttpClient)
 
 	total_time_ = static_cast<int>(total_time * 1000000);
@@ -393,6 +400,8 @@ void CurlRequest::done(int errCode, const char* errDesc)
 		<< " CONNECT TIME:" << connect_time_ << "us"
 		<< " NAMELOOPUP TIME:" << namelookup_time_ << "us"
 		<< " errCode = " << errCode << " errDesc = " << errDesc;
+=======
+>>>>>>> parent of 755b2ca (ä¼˜åŒ–curlHttpClient)
 
 	if (doneCb_)
 	{

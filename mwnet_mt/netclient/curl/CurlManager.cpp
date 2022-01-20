@@ -52,6 +52,9 @@ int CurlManager::curlmSocketOptCbInLoop(CURL* c, int fd, int what, void* socketp
 	LOG_DEBUG << "CurlManager::curlmSocketOptCbInLoop [" << this << "] [" << socketp << "] fd=" << fd
 			  << " what=" << whatstr[what];
 
+<<<<<<< HEAD
+>>>>>>> parent of 755b2ca (ä¼˜åŒ–curlHttpClient)
+=======
 >>>>>>> parent of 755b2ca (ä¼˜åŒ–curlHttpClient)
 	// ÊÂ¼þÒÆ³ý
 	if (what == CURL_POLL_REMOVE) 
