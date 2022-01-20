@@ -16,7 +16,7 @@ CurlRequest::CurlRequest(const std::string& url, uint64_t req_uuid, bool bKeepAl
 	  responseBodyStr_(""),
 	  responseHeaderStr_(""),
 	  keep_alive_(bKeepAlive),
-	  fd_(-1),
+	  //fd_(-1),
 	  req_type_(req_type),
 	  url_(url),
 	  http_ver_(http_ver),
@@ -35,7 +35,7 @@ void CurlRequest::initCurlRequest(const std::string& url, uint64_t req_uuid, boo
 	responseBodyStr_ = "";
 	responseHeaderStr_ = "";
 	keep_alive_ = bKeepAlive;
-	fd_ = -1;
+	//fd_ = bKeepAlive?fd_:-1;
 	req_type_ = req_type,
 	url_ = url;
 	http_ver_ = http_ver;
@@ -101,6 +101,8 @@ void CurlRequest::initCurlRequest(const std::string& url, uint64_t req_uuid, boo
 	else
 	{
 		curl_easy_setopt(curl_, CURLOPT_TCP_KEEPALIVE, 1L);
+		curl_easy_setopt(curl_, CURLOPT_TCP_KEEPIDLE, 20L);
+		curl_easy_setopt(curl_, CURLOPT_TCP_KEEPINTVL, 10L);
 	}
 	
 	curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, &CurlRequest::bodyDataCb);
@@ -119,8 +121,8 @@ void CurlRequest::initCurlRequest(const std::string& url, uint64_t req_uuid, boo
 
 	curl_easy_setopt(curl_, CURLOPT_NOSIGNAL, 1L);
 
-	//禁用全局dns cache
-	curl_easy_setopt(curl_, CURLOPT_DNS_USE_GLOBAL_CACHE, 0L);
+	//全局dns cache 60s
+	curl_easy_setopt(curl_, CURLOPT_DNS_USE_GLOBAL_CACHE, 60L);
 	
 	// 接管curl的closesocket,socket的关闭交由httprequest结束时关闭channel时再做
 	// 如果socket的关闭交由curl管理，由于时序问题，会造成fd复用，上层无法及时获取，所以由上层来关闭
@@ -137,7 +139,7 @@ void CurlRequest::initCurlRequest(const std::string& url, uint64_t req_uuid, boo
 // 关闭socket
 void closeFd(const CurlRequestPtr& p, int fd)
 {
-	LOG_DEBUG << "CurlRequest::closeFd:" << fd;
+	LOG_DEBUG << "fd = " << fd;
 
 	if (fd > 0)
 	{
@@ -153,10 +155,6 @@ CurlRequest::~CurlRequest()
 
 	// 释放curl easy句柄
 	cleanCurlHandles();
-
-	// 关闭socket
-	//closeFd(nullptr, fd_);
-	//fd_ = -1;
 	
 	LOG_DEBUG  << "CurlRequest: ~CurlRequest";
 }
@@ -164,12 +162,13 @@ CurlRequest::~CurlRequest()
 // 清理curl句柄
 void CurlRequest::cleanCurlHandles()
 {
-	LOG_DEBUG << "CurlRequest::cleanCurlHandles";
+	LOG_DEBUG << "curl = " << curl_;
 	
 	// 清除所有easy curl使用的地址空间
 	curl_easy_cleanup(curl_);
 }
 
+/*
 int CurlRequest::hookOpenSocket(void *clientp, curlsocktype purpose, struct curl_sockaddr *address)
 {
 	int fd = -1;
@@ -178,22 +177,19 @@ int CurlRequest::hookOpenSocket(void *clientp, curlsocktype purpose, struct curl
 	{
 		 p->fd_ = fd = ::socket(address->family, address->socktype, address->protocol);
 	}
-	LOG_DEBUG << "hookOpenSocket:" << fd;
+	LOG_DEBUG << "fd = " << fd;
 	return fd;
 }
+*/
 
 int CurlRequest::hookCloseSocket(void *clientp, int fd)
-{
-	return 0;
-
-	LOG_DEBUG << "CurlRequest::hookCloseSocket: fd:" << fd << " clientp:" << clientp;
-	//CurlRequest* p = static_cast<CurlRequest*>(clientp);
+{	
+	LOG_DEBUG << "fd = " << fd;
 	uint64_t req_uuid = reinterpret_cast<uint64_t>(clientp);
 	CurlRequestPtr p = HttpRequesting::GetInstance().find(req_uuid);
 	if (p)
 	{
-		LOG_DEBUG << "CurlRequest::hookCloseSocket: CurlRequestPtr:" << p.get();
-		p->fd_ = -1;
+		LOG_DEBUG << "CurlRequestPtr = " << p.get();
 		// 放入loop, 关闭socket
 		p->loop_->queueInLoop(std::bind(closeFd, p, fd));
 	}
@@ -229,14 +225,14 @@ void CurlRequest::setDnsCacheTimeOut(long cache_timeout)
 // 取消请求
 void CurlRequest::forceCancel()
 {
-	LOG_DEBUG << "CurlRequest::forceCancel " << req_uuid_;
+	LOG_DEBUG << "req_uuid = " << req_uuid_;
 	loop_->queueInLoop(std::bind(&CurlManager::forceCancelRequest, cm_, req_uuid_));
 }
 
 // 强制取消请求(内部调用)
 void CurlRequest::forceCancelInner()
 {
-	LOG_DEBUG << "CurlRequest::forceCancelInner " << req_uuid_;
+	LOG_DEBUG << "req_uuid = " << req_uuid_;
 	loop_->queueInLoop(std::bind(&CurlManager::forceCancelRequestInner, cm_, shared_from_this()));
 }
 
@@ -256,7 +252,7 @@ void CurlRequest::request(CurlManager* cm, CURLM* multi, EventLoop* loop)
 	// 加入事件管理器中，响应事件
 	curl_multi_add_handle(multi, curl_);
 
-	LOG_DEBUG << "CurlRequest::request";
+	LOG_DEBUG << "multi = " << multi << " curl = " << curl_;
 }
 
 // 内部使用
@@ -279,7 +275,7 @@ void CurlRequest::cleanHeaders()
 
 void CurlRequest::removeMultiHandle(CURLM* multi)
 {		
-	LOG_DEBUG << "CurlRequest::removeMultiHandle";
+	LOG_DEBUG << "multi = " << multi;
 	
 	// 将curl从事件管理器中移除，之后将不再响应事件
 	curl_multi_remove_handle(multi, curl_);
@@ -356,35 +352,35 @@ std::string CurlRequest::getResponseContentType()
 
 void CurlRequest::done(int errCode, const char* errDesc)
 {
-	LOG_DEBUG << "CurlRequest::done";
 	rsp_time_ = Timestamp::GetCurrentTimeUs();
 	
 	double total_time;
 	curl_easy_getinfo(curl_, CURLINFO_TOTAL_TIME, &total_time);
-	LOG_DEBUG << "TOTAL TIME:" << total_time*1000000 << "us";
-
+	
 	double connect_time;
 	curl_easy_getinfo(curl_, CURLINFO_CONNECT_TIME, &connect_time);
-	LOG_DEBUG << "CONNECT TIME:" << connect_time*1000000 << "us";
-
+	
 	double nameloopup_time;
 	curl_easy_getinfo(curl_, CURLINFO_NAMELOOKUP_TIME, &nameloopup_time);
-	LOG_DEBUG << "NAMELOOPUP TIME:" << nameloopup_time*1000000 << "us";
 
-	total_time_ = static_cast<int>(total_time*1000000);
-	connect_time_ = static_cast<int>(connect_time*1000000);
-	namelookup_time_ = static_cast<int>(nameloopup_time*1000000);
-	
+	total_time_ = static_cast<int>(total_time * 1000000);
+	connect_time_ = static_cast<int>(connect_time * 1000000);
+	namelookup_time_ = static_cast<int>(nameloopup_time * 1000000);
+
+	LOG_DEBUG << "TOTAL TIME:" << total_time_ << "us"
+		<< " CONNECT TIME:" << connect_time_ << "us"
+		<< " NAMELOOPUP TIME:" << namelookup_time_ << "us"
+		<< " errCode = " << errCode << " errDesc = " << errDesc;
+
 	if (doneCb_)
 	{
 		doneCb_(shared_from_this(), errCode, errDesc);
 	}
-	LOG_DEBUG << "CurlRequest::done";
 }
 
 void CurlRequest::responseBodyCallback(const char* buffer, int len)
 {
-	LOG_DEBUG << "responseBodyCallback-len:" << len << " data:" << buffer;
+	LOG_DEBUG << "len = " << len << " data = " << buffer;
 
 	responseBodyStr_.append(buffer, len);
 	

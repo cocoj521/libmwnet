@@ -73,7 +73,7 @@ EventLoop::EventLoop()
     currentActiveChannel_(NULL),
     quitLatch_(new CountDownLatch(1))
 {
-  LOG_DEBUG << "EventLoop created " << this << " in thread " << threadId_;
+  LOG_TRACE << "EventLoop created " << this << " in thread " << threadId_;
   if (t_loopInThisThread)
   {
     LOG_FATAL << "Another EventLoop " << t_loopInThisThread
@@ -92,7 +92,7 @@ EventLoop::EventLoop()
 
 EventLoop::~EventLoop()
 {
-  LOG_DEBUG << "EventLoop " << this << " of thread " << threadId_
+  LOG_TRACE << "EventLoop " << this << " of thread " << threadId_
             << " destructs in thread " << CurrentThread::tid();
   wakeupChannel_->disableAll();
   wakeupChannel_->remove();
@@ -263,7 +263,7 @@ void EventLoop::updateChannel(Channel* channel)
   poller_->updateChannel(channel);
 }
 
-void EventLoop::removeChannel(Channel* channel)
+void EventLoop::removeChannel(Channel* channel, bool eraseEpoll)
 {
   assert(channel->ownerLoop() == this);
   assertInLoopThread();
@@ -272,7 +272,7 @@ void EventLoop::removeChannel(Channel* channel)
     //LOG_INFO << "activechnnel:"<<currentActiveChannel_ << "  removechannel:" << channel;
     assert(currentActiveChannel_ == channel || std::find(activeChannels_.begin(), activeChannels_.end(), channel) == activeChannels_.end());
   }
-  poller_->removeChannel(channel);
+  poller_->removeChannel(channel, eraseEpoll);
 }
 
 bool EventLoop::hasChannel(Channel* channel)

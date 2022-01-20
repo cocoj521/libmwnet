@@ -87,15 +87,18 @@ void EPollPoller::fillActiveChannels(int numEvents,
   for (int i = 0; i < numEvents; ++i)
   {
     Channel* channel = static_cast<Channel*>(events_[i].data.ptr);
-	LOG_TRACE << "fd=" << channel->fd();
-#ifndef NDEBUG
-    int fd = channel->fd();
-    ChannelMap::const_iterator it = channels_.find(fd);
-    assert(it != channels_.end());
-    assert(it->second == channel);
-#endif
-    channel->set_revents(events_[i].events);
-    activeChannels->push_back(channel);
+	ChannelMap::const_iterator it = channels_.find(channel);
+	if (it != channels_.end() && it->second == channel)
+	{
+		LOG_TRACE << "channel = " << channel << " fd = " << channel->fd();
+
+		channel->set_revents(events_[i].events);
+		activeChannels->push_back(channel);
+	}
+	else
+	{
+		LOG_SYSERR << "channel = " << channel << "  has been removed";
+	}
   }
 }
 
@@ -103,21 +106,20 @@ void EPollPoller::updateChannel(Channel* channel)
 {
   Poller::assertInLoopThread();
   const int index = channel->index();
-  LOG_TRACE << "fd = " << channel->fd()
+  LOG_TRACE << "channel = " << channel << " fd = " << channel->fd()
     << " events = " << channel->events() << " index = " << index;
   if (index == kNew || index == kDeleted)
   {
     // a new one, add with EPOLL_CTL_ADD
-    int fd = channel->fd();
     if (index == kNew)
     {
-      assert(channels_.find(fd) == channels_.end());
-      channels_[fd] = channel;
+	  assert(channels_.find(channel) == channels_.end());
+	  channels_[channel] = channel;
     }
     else // index == kDeleted
     {
-      assert(channels_.find(fd) != channels_.end());
-      assert(channels_[fd] == channel);
+	  assert(channels_.find(channel) != channels_.end());
+	  assert(channels_[channel] == channel);
     }
 
     channel->set_index(kAdded);
@@ -126,10 +128,8 @@ void EPollPoller::updateChannel(Channel* channel)
   else
   {
     // update existing one with EPOLL_CTL_MOD/DEL
-    int fd = channel->fd();
-    (void)fd;
-    assert(channels_.find(fd) != channels_.end());
-    assert(channels_[fd] == channel);
+	assert(channels_.find(channel) != channels_.end());
+	assert(channels_[channel] == channel);
     assert(index == kAdded);
     if (channel->isNoneEvent())
     {
@@ -143,21 +143,20 @@ void EPollPoller::updateChannel(Channel* channel)
   }
 }
 
-void EPollPoller::removeChannel(Channel* channel)
+void EPollPoller::removeChannel(Channel* channel, bool eraseEpoll)
 {
   Poller::assertInLoopThread();
-  int fd = channel->fd();
-  LOG_TRACE << "fd = " << fd;
-  assert(channels_.find(fd) != channels_.end());
-  assert(channels_[fd] == channel);
+  LOG_TRACE << "channel = " << channel << " fd = " << channel->fd();
+  assert(channels_.find(channel) != channels_.end());
+  assert(channels_[channel] == channel);
   assert(channel->isNoneEvent());
   int index = channel->index();
   assert(index == kAdded || index == kDeleted);
-  size_t n = channels_.erase(fd);
+  size_t n = channels_.erase(channel);
   (void)n;
   assert(n == 1);
 
-  if (index == kAdded)
+  if (index == kAdded && eraseEpoll)
   {
     update(EPOLL_CTL_DEL, channel);
   }
@@ -171,7 +170,7 @@ void EPollPoller::update(int operation, Channel* channel)
   event.events = channel->events();
   event.data.ptr = channel;
   int fd = channel->fd();
-  LOG_TRACE << "epoll_ctl op = " << operationToString(operation)
+  LOG_TRACE << "channel = " << channel << " epoll_ctl op = " << operationToString(operation)
     << " fd = " << fd << " event = { " << channel->eventsToString() << " }";
   if (::epoll_ctl(epollfd_, operation, fd, &event) < 0)
   {

@@ -105,7 +105,7 @@ void PollPoller::updateChannel(Channel* channel)
   }
 }
 
-void PollPoller::removeChannel(Channel* channel)
+void PollPoller::removeChannel(Channel* channel, bool eraseEpoll = false)
 {
   Poller::assertInLoopThread();
   LOG_TRACE << "fd = " << channel->fd();
@@ -116,7 +116,7 @@ void PollPoller::removeChannel(Channel* channel)
   assert(0 <= idx && idx < static_cast<int>(pollfds_.size()));
   const struct pollfd& pfd = pollfds_[idx]; (void)pfd;
   assert(pfd.fd == -channel->fd()-1 && pfd.events == channel->events());
-  size_t n = channels_.erase(channel->fd());
+  size_t n = channels_.erase(channel);
   assert(n == 1); (void)n;
   if (implicit_cast<size_t>(idx) == pollfds_.size()-1)
   {

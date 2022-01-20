@@ -82,8 +82,7 @@ class Channel : noncopyable
   void doNotLogHup() { logHup_ = false; }
 
   EventLoop* ownerLoop() { return loop_; }
-  void remove();
-
+  void remove(bool eraseEpoll=true);
  private:
   static string eventsToString(int fd, int ev);
 

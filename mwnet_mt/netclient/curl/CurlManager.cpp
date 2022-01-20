@@ -48,9 +48,6 @@ void CurlManager::delEvLoop(void* p, int fd, int what)
 
 int CurlManager::curlmSocketOptCbInLoop(CURL* c, int fd, int what, void* socketp)
 {
-	const char *whatstr[]={ "none", "IN", "OUT", "INOUT", "REMOVE" };
-	LOG_DEBUG << "CurlManager::curlmSocketOptCbInLoop [" << this << "] [" << socketp << "] fd=" << fd
-			  << " what=" << whatstr[what];
 	// 事件移除
 	if (what == CURL_POLL_REMOVE) 
 	{
@@ -99,12 +96,14 @@ int CurlManager::curlmSocketOptCbInLoop(CURL* c, int fd, int what, void* socketp
 
 int CurlManager::curlmSocketOptCb(CURL* c, int fd, int what, void* userp, void* socketp)
 {
-	LOG_DEBUG << "CurlManager::curlmSocketOptCb fd=" << fd;
-
 	CurlManager* cm = static_cast<CurlManager*>(userp);
 	
 	if (NULL == cm || fd <= 0) return 0;
 	
+	const char *whatstr[] = { "none", "IN", "OUT", "INOUT", "REMOVE" };
+	LOG_DEBUG << "cm = " << cm << " curl = " << c << " fd = " << fd
+		<< " userp = " << userp << " socketp = " << socketp  << " what = " << whatstr[what];
+
 	cm->curlmSocketOptCbInLoop(c, fd, what, socketp);
 		
 	return 0;
@@ -112,7 +111,7 @@ int CurlManager::curlmSocketOptCb(CURL* c, int fd, int what, void* userp, void* 
 
 int CurlManager::curlmTimerCb(CURLM* curlm, long ms, void* userp)
 {	
-	LOG_DEBUG << "curlmTimerCb::CurlManager:" << userp << " ms:" << ms << " ms";
+	LOG_DEBUG << "cm = " << curlm << " userp = " << userp << " ms = " << ms;
 	
 	CurlManager* cm = static_cast<CurlManager*>(userp);
 	if (NULL != cm)
@@ -155,8 +154,6 @@ void CurlManager::createTimer(long ms)
 
 void CurlManager::curlmTimerCbInLoop(long ms)
 {
-	LOG_DEBUG << "CurlManager::curlmTimerCbInLoop:" << ms << "ms";
-
 	if (0 == ms)
 	{
 		// 先取消已有timer
@@ -230,7 +227,7 @@ CurlRequestPtr CurlManager::getRequest(const std::string& url, bool bKeepAlive, 
 		p->initCurlRequest(url, req_uuid, bKeepAlive, req_type, http_ver);
 	}
 
-	LOG_DEBUG << "getRequest requuid:" << req_uuid;
+	LOG_DEBUG << " CurlRequestPtr = " << p.get() << " req_uuid = " << req_uuid;
 		
 	return p;
 }
@@ -321,7 +318,7 @@ void CurlManager::onErrEventCallBack(int fd)
 
 void CurlManager::check_multi_info()
 {
-	LOG_DEBUG << "check_multi_info::prevRunningHandles_ = " << prevRunningHandles_ << ", runningHandles_ = " << runningHandles_;
+	LOG_DEBUG << "prevRunningHandles_ = " << prevRunningHandles_ << " runningHandles_ = " << runningHandles_;
 	if (prevRunningHandles_ > runningHandles_ || runningHandles_ == 0)
 	{
 		CURLMsg* msg = NULL;
@@ -336,7 +333,7 @@ void CurlManager::check_multi_info()
 				CurlRequestPtr request = HttpRequesting::GetInstance().find(c);
 				if (request && request->getCurl() == c)
 				{
-					LOG_DEBUG <<"check_multi_info::" << request.get() << " done:" << curl_easy_strerror(retCode);
+					LOG_DEBUG <<"CurlRequestPtr = " << request.get() << " done = " << curl_easy_strerror(retCode);
 					request->done(retCode, curl_easy_strerror(retCode));
 
 					afterRequestDone(request);
@@ -381,7 +378,7 @@ void CurlManager::forceCancelRequest(uint64_t req_uuid)
 // 处理中断请求(内部调用)
 void CurlManager::forceCancelRequestInner(const CurlRequestPtr& request)
 {
-	LOG_DEBUG << "CurlManager::forceCancelRequestInner " << request->getReqUUID();
+	LOG_DEBUG << "req_uuid = " << request->getReqUUID();
 	
 	// 移除内部定时器
 	loop_->cancel(request->timerid_);

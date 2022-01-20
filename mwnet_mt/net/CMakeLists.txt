@@ -17,7 +17,7 @@ set(net_SRCS
   Poller.cc
   poller/DefaultPoller.cc
   poller/EPollPoller.cc
-  poller/PollPoller.cc
+  #poller/PollPoller.cc
   httpparser/httpparser.cpp
   httpparser/http_parser.c
   Socket.cc

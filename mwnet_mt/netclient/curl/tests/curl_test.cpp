@@ -181,7 +181,7 @@ void testTextMatchSvr(int post_get, const std::string& strHttpUrl, const std::st
 		////////////////////////////////
 		http_request->SetContentType("application/json;charset=UTF-8");
 
-		http_request->SetTimeOut(30, 60);
+		http_request->SetTimeOut(3, 10);
 		//http_request->SetKeepAliveTime();
 		//http_request->SetHeader("myheader1", "nothing1");
 		//http_request->SetHeader("myheader2", "nothing2");
@@ -271,7 +271,7 @@ int main(int argc, char* argv[])
 	//初始化并启动发送线程
 	ThreadPoolPtr pPool(new mwnet_mt::ThreadPool("testcurl"));
 	pPool->setMaxQueueSize(10000);
-	pPool->start(8);
+	pPool->start(1);
 
 	//loop test.......
 	int64_t ttmp = 0;

@@ -41,7 +41,7 @@ class Poller : noncopyable
 
   /// Remove the channel, when it destructs.
   /// Must be called in the loop thread.
-  virtual void removeChannel(Channel* channel) = 0;
+  virtual void removeChannel(Channel* channel, bool eraseEpoll=true) = 0;
 
   virtual bool hasChannel(Channel* channel) const;
 
@@ -53,7 +53,8 @@ class Poller : noncopyable
   }
 
  protected:
-  typedef std::map<int, Channel*> ChannelMap;
+  //typedef std::map<int, Channel*> ChannelMap;
+  typedef std::map<Channel*, Channel*> ChannelMap;
   ChannelMap channels_;
 
  private:

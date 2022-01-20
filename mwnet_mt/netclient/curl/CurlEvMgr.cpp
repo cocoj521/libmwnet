@@ -69,9 +69,6 @@ void* CurlEvMgr::delEvLoop(void* p, int fd, int what)
 		ch->disableAll();
 		ch->remove();
 
-		// 关闭socket
-		closeFd(ch->fd());
-
 		// 释放通道指针
 		delete ch;
 	}

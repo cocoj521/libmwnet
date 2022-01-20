@@ -50,7 +50,7 @@ public:
 
 	// 初始化请求参数
 	void initCurlRequest(const std::string& url, uint64_t req_uuid, bool bKeepAlive, int req_type, int http_ver);
-	
+
 	/**
 	 * 发起请求
 	 */
@@ -76,6 +76,10 @@ public:
 	void setKeepAliveTime(long keep_idle=30, long keep_intvl=10);
 
 	bool isKeepAlive() {return keep_alive_;}
+
+	//bool isValidFd() { return fd_ > 0; }
+	
+	//int getFd() { return fd_; }
 
 	void setDnsCacheTimeOut(long cache_timeout=60);
 	
@@ -232,7 +236,7 @@ private:
 	static int hookCloseSocket(void *clientp,  int fd);
 
 	// 接管socket创建事件
-	static int hookOpenSocket(void *clientp, curlsocktype purpose, struct curl_sockaddr *address);
+	//static int hookOpenSocket(void *clientp, curlsocktype purpose, struct curl_sockaddr *address);
 private:
 	// 请求的惟一id
 	uint64_t req_uuid_;
@@ -263,7 +267,7 @@ private:
 	// keepalive or close
 	bool keep_alive_;
 	// socket句柄
-	int fd_;
+	//int fd_;
 	// POST/GET	
 	int req_type_;
 	std::string url_;

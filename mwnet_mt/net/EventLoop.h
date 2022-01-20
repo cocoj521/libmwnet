@@ -113,7 +113,7 @@ class EventLoop : noncopyable
   // internal usage
   void wakeup();
   void updateChannel(Channel* channel);
-  void removeChannel(Channel* channel);
+  void removeChannel(Channel* channel, bool eraseEpoll=true);
   bool hasChannel(Channel* channel);
 
   // pid_t threadId() const { return threadId_; }
