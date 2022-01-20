@@ -27,9 +27,7 @@ void CurlManager::addEvLoop(void* p, int fd, int what)
 	// 加入事件循环
 	curl_evmgr_->addEvLoop(p, fd, what,
 							std::bind(&CurlManager::onReadEventCallBack, this, fd),
-							std::bind(&CurlManager::onWriteEventCallBack, this, fd),
-							std::bind(&CurlManager::onCloseEventCallBack, this, fd),
-							std::bind(&CurlManager::onErrEventCallBack, this, fd));
+							std::bind(&CurlManager::onWriteEventCallBack, this, fd));
 	// 根据what的值,注册要响应的事件
 	curl_evmgr_->optEvLoop(p, fd, what);
 }
@@ -48,6 +46,13 @@ void CurlManager::delEvLoop(void* p, int fd, int what)
 
 int CurlManager::curlmSocketOptCbInLoop(CURL* c, int fd, int what, void* socketp)
 {
+<<<<<<< HEAD
+=======
+	const char *whatstr[]={ "none", "IN", "OUT", "INOUT", "REMOVE" };
+	LOG_DEBUG << "CurlManager::curlmSocketOptCbInLoop [" << this << "] [" << socketp << "] fd=" << fd
+			  << " what=" << whatstr[what];
+
+>>>>>>> parent of 755b2ca (浼樺寲curlHttpClient)
 	// 事件移除
 	if (what == CURL_POLL_REMOVE) 
 	{
@@ -304,16 +309,6 @@ void CurlManager::onWriteEventCallBack(int fd)
 	LOG_DEBUG << "onWriteEventCallBack";
 	curl_multi_socket_action(curlm_, fd, CURL_POLL_OUT, &runningHandles_);
 	check_multi_info();
-}
-
-void CurlManager::onCloseEventCallBack(int fd)
-{
-	LOG_DEBUG << "onCloseEventCallBack";
-}
-
-void CurlManager::onErrEventCallBack(int fd)
-{
-	LOG_DEBUG << "onErrEventCallBack";
 }
 
 void CurlManager::check_multi_info()

@@ -87,6 +87,7 @@ void EPollPoller::fillActiveChannels(int numEvents,
   for (int i = 0; i < numEvents; ++i)
   {
     Channel* channel = static_cast<Channel*>(events_[i].data.ptr);
+<<<<<<< HEAD
 	ChannelMap::const_iterator it = channels_.find(channel);
 	if (it != channels_.end() && it->second == channel)
 	{
@@ -99,6 +100,16 @@ void EPollPoller::fillActiveChannels(int numEvents,
 	{
 		LOG_SYSERR << "channel = " << channel << "  has been removed";
 	}
+=======
+#ifndef NDEBUG
+    int fd = channel->fd();
+    ChannelMap::const_iterator it = channels_.find(fd);
+    assert(it != channels_.end());
+    assert(it->second == channel);
+#endif
+    channel->set_revents(events_[i].events);
+    activeChannels->push_back(channel);
+>>>>>>> parent of 755b2ca (优化curlHttpClient)
   }
 }
 
@@ -185,7 +196,7 @@ void EPollPoller::update(int operation, Channel* channel)
     }
     */
     //如果这里不成功，表示fd已无效，没必要纠结
-    LOG_SYSERR << "epoll_ctl op =" << operationToString(operation) << " fd =" << fd;
+    //LOG_SYSERR << "epoll_ctl op =" << operationToString(operation) << " fd =" << fd;
   }
 }
 

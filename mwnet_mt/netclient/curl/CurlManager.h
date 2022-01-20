@@ -64,10 +64,6 @@ public:
 	 */
 	void onWriteEventCallBack(int fd);
 
-	void onCloseEventCallBack(int fd);
-	
-	void onErrEventCallBack(int fd);
-
 	// 判断事件循环中是否还有未完成事件
 	size_t isLoopRunning();
 
