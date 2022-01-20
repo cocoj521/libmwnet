@@ -53,6 +53,9 @@ int CurlManager::curlmSocketOptCbInLoop(CURL* c, int fd, int what, void* socketp
 			  << " what=" << whatstr[what];
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> parent of 755b2ca (优化curlHttpClient)
+=======
 >>>>>>> parent of 755b2ca (优化curlHttpClient)
 =======
 >>>>>>> parent of 755b2ca (优化curlHttpClient)

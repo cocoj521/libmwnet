@@ -89,6 +89,7 @@ void EPollPoller::fillActiveChannels(int numEvents,
     Channel* channel = static_cast<Channel*>(events_[i].data.ptr);
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 	ChannelMap::const_iterator it = channels_.find(channel);
 	if (it != channels_.end() && it->second == channel)
 	{
@@ -102,6 +103,8 @@ void EPollPoller::fillActiveChannels(int numEvents,
 		LOG_SYSERR << "channel = " << channel << "  has been removed";
 	}
 =======
+=======
+>>>>>>> parent of 755b2ca (优化curlHttpClient)
 =======
 >>>>>>> parent of 755b2ca (优化curlHttpClient)
 #ifndef NDEBUG
