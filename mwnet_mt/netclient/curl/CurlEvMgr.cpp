@@ -40,10 +40,10 @@ void* CurlEvMgr::addEvLoop(void* p, int fd, int what, const ReadEventCallback& r
 	{
 		ch->tie(shared_from_this());
 		
-		// 设置读写回调函数
+		// 设置读/写/关闭/异常回调函数
 		ch->setReadCallback(read_cb);
 		ch->setWriteCallback(write_cb);
-	
+
 		// 标识通道可读（会响应POLL_IN事件）
 		ch->enableReading();
 		
@@ -64,15 +64,6 @@ void* CurlEvMgr::delEvLoop(void* p, int fd, int what)
 		// 关闭通道
 		ch->disableAll();
 		ch->remove();
-
-<<<<<<< HEAD
-=======
-		// 关闭socket
-		//closeFd(ch->fd());
-
->>>>>>> parent of 755b2ca (浼樺寲curlHttpClient)
-		// 释放通道指针
-		delete ch;
 	}
 	
 	return NULL;

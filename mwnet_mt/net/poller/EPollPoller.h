@@ -28,7 +28,7 @@ class EPollPoller : public Poller
 
   virtual Timestamp poll(int timeoutMs, ChannelList* activeChannels);
   virtual void updateChannel(Channel* channel);
-  virtual void removeChannel(Channel* channel, bool eraseEpoll = true);
+  virtual void removeChannel(Channel* channel);
 
  private:
   static const int kInitEventListSize = 16;

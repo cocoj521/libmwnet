@@ -266,8 +266,6 @@ private:
 	boost::any context_;
 	// keepalive or close
 	bool keep_alive_;
-	// socket¾ä±ú
-	//int fd_;
 	// POST/GET	
 	int req_type_;
 	std::string url_;

@@ -57,7 +57,7 @@ void Channel::update()
 	}
 }
 
-void Channel::remove(bool eraseEpoll)
+void Channel::remove()
 {
 	if (!removed_)
 	{

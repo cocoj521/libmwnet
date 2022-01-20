@@ -263,7 +263,7 @@ void EventLoop::updateChannel(Channel* channel)
   poller_->updateChannel(channel);
 }
 
-void EventLoop::removeChannel(Channel* channel, bool eraseEpoll)
+void EventLoop::removeChannel(Channel* channel)
 {
   assert(channel->ownerLoop() == this);
   assertInLoopThread();
@@ -272,7 +272,7 @@ void EventLoop::removeChannel(Channel* channel, bool eraseEpoll)
     //LOG_INFO << "activechnnel:"<<currentActiveChannel_ << "  removechannel:" << channel;
     assert(currentActiveChannel_ == channel || std::find(activeChannels_.begin(), activeChannels_.end(), channel) == activeChannels_.end());
   }
-  poller_->removeChannel(channel, eraseEpoll);
+  poller_->removeChannel(channel);
 }
 
 bool EventLoop::hasChannel(Channel* channel)

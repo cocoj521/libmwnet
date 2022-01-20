@@ -64,6 +64,10 @@ public:
 	 */
 	void onWriteEventCallBack(int fd);
 
+	void onCloseEventCallBack(int fd);
+	
+	void onErrEventCallBack(int fd);
+
 	// 判断事件循环中是否还有未完成事件
 	size_t isLoopRunning();
 
@@ -102,6 +106,7 @@ private:
 	void addEvLoop(void* p, int fd, int what);
 	void optEvLoop(void* p, int fd, int what);
 	void delEvLoop(void* p, int fd, int what);
+	void delEv(void* p);
 	
 	// curlm超时回调函数CURLMOPT_TIMERFUNCTION
 	static int curlmTimerCb(CURLM* curlm, long ms, void* userp);

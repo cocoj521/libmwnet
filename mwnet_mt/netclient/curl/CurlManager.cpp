@@ -44,21 +44,17 @@ void CurlManager::delEvLoop(void* p, int fd, int what)
 	curl_evmgr_->delEvLoop(p, fd, what);
 }
 
+void CurlManager::delEv(void* p)
+{
+	// 移除事件循环
+	curl_evmgr_->delEv(p);
+}
+
 int CurlManager::curlmSocketOptCbInLoop(CURL* c, int fd, int what, void* socketp)
 {
-<<<<<<< HEAD
-=======
 	const char *whatstr[]={ "none", "IN", "OUT", "INOUT", "REMOVE" };
 	LOG_DEBUG << "CurlManager::curlmSocketOptCbInLoop [" << this << "] [" << socketp << "] fd=" << fd
 			  << " what=" << whatstr[what];
-
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> parent of 755b2ca (浼樺寲curlHttpClient)
-=======
->>>>>>> parent of 755b2ca (浼樺寲curlHttpClient)
-=======
->>>>>>> parent of 755b2ca (浼樺寲curlHttpClient)
 	// 事件移除
 	if (what == CURL_POLL_REMOVE) 
 	{
@@ -66,6 +62,7 @@ int CurlManager::curlmSocketOptCbInLoop(CURL* c, int fd, int what, void* socketp
 		curl_multi_assign(curlm_, fd, NULL);
 		// 放入loop,移除事件循环
 		loop_->queueInLoop(std::bind(&CurlManager::delEvLoop, this, socketp, fd, what));
+		loop_->runAfter(1.0, std::bind(&CurlManager::delEv, this, socketp));
 	}
 	else 
 	{

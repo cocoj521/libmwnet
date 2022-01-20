@@ -181,7 +181,7 @@ void testTextMatchSvr(int post_get, const std::string& strHttpUrl, const std::st
 		////////////////////////////////
 		http_request->SetContentType("application/json;charset=UTF-8");
 
-		http_request->SetTimeOut(3, 10);
+		http_request->SetTimeOut(30, 60);
 		//http_request->SetKeepAliveTime();
 		//http_request->SetHeader("myheader1", "nothing1");
 		//http_request->SetHeader("myheader2", "nothing2");
