@@ -441,7 +441,6 @@ int  CurlHttpClient::SendHttpRequest(const HttpRequestPtr& request, const boost:
 		uint64_t count = total_req_.load();
 		uint64_t index = count % static_cast<uint64_t>(httpclis_.size());
 		boost::any& _any = httpclis_[index];
-		
 		if (!_any.empty())
 		{
 			std::shared_ptr<CurlManager> curlm = boost::any_cast<std::shared_ptr<CurlManager>>(_any);

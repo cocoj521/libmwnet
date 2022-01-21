@@ -52,9 +52,9 @@ FILE *g_fp = NULL;
 // »Øµ÷º¯Êý
 int func_onmsg_cb(void* pInvoker, uint64_t req_uuid, const boost::any& params, const HttpResponsePtr& response)
 {
-	//if (response->GetErrCode() != 0 || response->GetRspCode() != 200)
+	if (response->GetErrCode() != 0 || response->GetRspCode() != 200)
 	{
-		//++rspErrCnt_;
+		++rspErrCnt_;
 		LOG_INFO
 			<< "URL:" << response->GetEffectiveUrl() << ",code:" << response->GetErrCode() << ",desc:" << response->GetErrDesc()
 			<< "\n" << "ResponseCode:" << response->GetRspCode()

@@ -51,7 +51,7 @@ public:
 	/**
 	 * 发起请求
 	 */
-	void request(CurlManager* cm, CURLM* multi);
+	void request(CURLM* multi);
 
 	// 强制取消请求
 	void forceCancel();
@@ -236,8 +236,6 @@ private:
 	CURL* curl_;
 	// http请求头指针
 	curl_slist* headers_;
-	// curl管理类指针
-	CurlManager* cm_;
 	// 包体回调函数
 	DataCallback bodyCb_;
 	// 包头回调函数

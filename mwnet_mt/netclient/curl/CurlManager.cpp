@@ -344,7 +344,7 @@ void CurlManager::sendRequestInLoop(const CurlRequestPtr& request)
 	// 先加入发送中
 	HttpRequesting::GetInstance().add(request);
 	// 发送请求
-	request->request(this, curlm_);
+	request->request(curlm_);
 }
 
 void CurlManager::check_multi_info()

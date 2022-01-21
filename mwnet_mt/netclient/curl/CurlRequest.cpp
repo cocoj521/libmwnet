@@ -185,14 +185,11 @@ void CurlRequest::forceCancelInner()
 	*/
 }
 
-void CurlRequest::request(CurlManager* cm, CURLM* multi)
+void CurlRequest::request(CURLM* multi)
 {
 	// 将头部信息加入curl
 	setHeaders();
 
-	// 管理器的指针
-	cm_ = cm;
-	
 	req_time_ = Timestamp::GetCurrentTimeUs();
 	
 	// 加入事件管理器中，响应事件
