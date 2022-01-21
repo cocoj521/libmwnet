@@ -6,21 +6,18 @@
 #include <memory>
 #include <string>
 #include <boost/any.hpp>
-#include <sys/time.h>
-#include <mwnet_mt/net/EventLoop.h>
-#include <mwnet_mt/net/TimerId.h>
-#include <mwnet_mt/base/Timestamp.h>
+#include <mwnet_mt/base/CountDownLatch.h>
 
 extern "C"
 {
 	typedef void CURLM;
 	typedef void CURL;
 }
-using namespace mwnet_mt;
-using namespace mwnet_mt::net;
 
 namespace curl
 {
+
+using namespace mwnet_mt;
 
 class CurlRequest;
 
@@ -54,7 +51,7 @@ public:
 	/**
 	 * 发起请求
 	 */
-	void request(CurlManager* cm, CURLM* multi, EventLoop* loop);
+	void request(CurlManager* cm, CURLM* multi);
 
 	// 强制取消请求
 	void forceCancel();
@@ -232,11 +229,6 @@ private:
 	 */
 	static size_t headerDataCb(char *buffer, size_t size, size_t nmemb, void *userp);
 
-	// 接管socket关闭事件
-	static int hookCloseSocket(void *clientp,  int fd);
-
-	// 接管socket创建事件
-	//static int hookOpenSocket(void *clientp, curlsocktype purpose, struct curl_sockaddr *address);
 private:
 	// 请求的惟一id
 	uint64_t req_uuid_;
@@ -244,8 +236,6 @@ private:
 	CURL* curl_;
 	// http请求头指针
 	curl_slist* headers_;
-	// 事件循环器
-	EventLoop* loop_;
 	// curl管理类指针
 	CurlManager* cm_;
 	// 包体回调函数
@@ -277,7 +267,6 @@ public:
 	uint64_t rsp_time_;
 	uint64_t req_time_;
 	uint64_t req_inque_time_;
-	TimerId timerid_;
 	long entire_timeout_;
 };
 

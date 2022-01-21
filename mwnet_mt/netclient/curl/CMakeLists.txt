@@ -4,7 +4,7 @@
 set(curl_SRCS
 	CurlRequest.cpp
 	CurlManager.cpp
-	CurlEvMgr.cpp
+	#CurlEvMgr.cpp
 	RequestManager.cpp
 	CurlHttpClient.cpp
 	Version.cc
@@ -16,7 +16,7 @@ else()
 	add_library(mwnet_mt_curl SHARED ${curl_SRCS})
 endif()
 
-target_link_libraries(mwnet_mt_curl mwnet_mt_netbase mwnet_mt_base mwnet_mt_util curl ssl crypto z cares pthread dl)
+target_link_libraries(mwnet_mt_curl mwnet_mt_netbase mwnet_mt_base mwnet_mt_util curl ssl crypto z cares pthread dl event_core event_pthreads)
 #target_link_libraries(mwnet_mt_curl mwnet_mt_netbase mwnet_mt_base curl ssl crypto z)
 
 install(TARGETS mwnet_mt_curl DESTINATION lib)

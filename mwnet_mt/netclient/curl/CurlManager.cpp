@@ -2,10 +2,11 @@
 #include "RequestManager.h"
 #include <mwnet_mt/base/Atomic.h>
 #include <mwnet_mt/base/Logging.h>
-#include <mwnet_mt/net/SocketsOps.h>
 #include <assert.h>
 #include <signal.h>
 #include <sys/eventfd.h>
+#include <sys/stat.h>
+#include <sys/cdefs.h>
 
 using namespace curl;
 // 发送消息总统计数
@@ -22,161 +23,6 @@ void CurlManager::uninitialize()
 	curl_global_cleanup();
 }
 
-void CurlManager::addEvLoop(void* p, int fd, int what)
-{
-	// 加入事件循环
-	curl_evmgr_->addEvLoop(p, fd, what,
-							std::bind(&CurlManager::onReadEventCallBack, this, fd),
-							std::bind(&CurlManager::onWriteEventCallBack, this, fd));
-	// 根据what的值,注册要响应的事件
-	curl_evmgr_->optEvLoop(p, fd, what);
-}
-
-void CurlManager::optEvLoop(void* p, int fd, int what)
-{
-	// 根据what的值,注册要响应的事件
-	curl_evmgr_->optEvLoop(p, fd, what);
-}
-
-void CurlManager::delEvLoop(void* p, int fd, int what)
-{
-	// 移除事件循环
-	curl_evmgr_->delEvLoop(p, fd, what);
-}
-
-void CurlManager::delEv(void* p)
-{
-	// 移除事件循环
-	curl_evmgr_->delEv(p);
-}
-
-int CurlManager::curlmSocketOptCbInLoop(CURL* c, int fd, int what, void* socketp)
-{
-	const char *whatstr[]={ "none", "IN", "OUT", "INOUT", "REMOVE" };
-	LOG_DEBUG << "CurlManager::curlmSocketOptCbInLoop [" << this << "] [" << socketp << "] fd=" << fd
-			  << " what=" << whatstr[what];
-	// 事件移除
-	if (what == CURL_POLL_REMOVE) 
-	{
-		// 将数据设置为与内部套接字解除关联
-		curl_multi_assign(curlm_, fd, NULL);
-		// 放入loop,移除事件循环
-		loop_->queueInLoop(std::bind(&CurlManager::delEvLoop, this, socketp, fd, what));
-		loop_->runAfter(1.0, std::bind(&CurlManager::delEv, this, socketp));
-	}
-	else 
-	{
-		if (!socketp)
-		{
-			// 生成EV
-			void* p = curl_evmgr_->getNewEv(fd);
-			// 将数据设置为与内部套接字添加关联
-			CURLMcode rc = curl_multi_assign(curlm_, fd, p);
-			if (0 == rc)
-			{
-				LOG_DEBUG << "curl_multi_assign:" << fd 
-						<< "-" << p
-						<< "-" << rc 
-						<< "-" << curl_multi_strerror(rc);
-				
-				// 放入loop,加入事件循环
-				loop_->queueInLoop(std::bind(&CurlManager::addEvLoop, this, p, fd, what));
-			}
-			else
-			{
-				LOG_DEBUG << "curl_multi_assign:" << fd 
-						<< "-" << p
-						<< "-" << rc 
-						<< "-" << curl_multi_strerror(rc);
-				
-				curl_evmgr_->delEv(p);
-			}
-		}
-		else
-		{
-			// 放入loop,根据what的值,注册要响应的事件
-			loop_->queueInLoop(std::bind(&CurlManager::optEvLoop, this, socketp, fd, what));
-		}
-	}
-	
-	return 0;
-}
-
-int CurlManager::curlmSocketOptCb(CURL* c, int fd, int what, void* userp, void* socketp)
-{
-	CurlManager* cm = static_cast<CurlManager*>(userp);
-	
-	if (NULL == cm || fd <= 0) return 0;
-	
-	const char *whatstr[] = { "none", "IN", "OUT", "INOUT", "REMOVE" };
-	LOG_DEBUG << "cm = " << cm << " curl = " << c << " fd = " << fd
-		<< " userp = " << userp << " socketp = " << socketp  << " what = " << whatstr[what];
-
-	cm->curlmSocketOptCbInLoop(c, fd, what, socketp);
-		
-	return 0;
-}
-
-int CurlManager::curlmTimerCb(CURLM* curlm, long ms, void* userp)
-{	
-	LOG_DEBUG << "cm = " << curlm << " userp = " << userp << " ms = " << ms;
-	
-	CurlManager* cm = static_cast<CurlManager*>(userp);
-	if (NULL != cm)
-	{		
-		// ms>0 ms=-1都不用处理
-		if (ms == 0)
-		{
-			// loop中执行			
-			cm->loop_->runInLoop(std::bind(&CurlManager::curlmTimerCbInLoop, cm, 0L));
-		}
-		else if (ms > 0)
-		{
-			// 创建timer
-			cm->loop_->queueInLoop(std::bind(&CurlManager::createTimer, cm, ms));
-		}
-		else
-		{	
-			// 取消timer
-			cm->loop_->queueInLoop(std::bind(&CurlManager::cancelTimer, cm));
-		}
-	}
-	
-	return 0;
-}
-
-void CurlManager::cancelTimer()
-{
-	loop_->cancel(timerid_);
-}
-
-void CurlManager::createTimer(long ms)
-{
-	// 先取消timer
-	loop_->cancel(timerid_);
-	
-	// 再创建
-	timerid_ = loop_->runAfter(static_cast<int>(ms)/1000.0, 
-				std::bind(&CurlManager::curlmTimerCbInLoop, shared_from_this(), ms));
-}
-
-void CurlManager::curlmTimerCbInLoop(long ms)
-{
-	if (0 == ms)
-	{
-		// 先取消已有timer
-		loop_->cancel(timerid_);
-	
-		curl_multi_socket_action(curlm_, CURL_SOCKET_TIMEOUT, 0, &runningHandles_);
-	}
-	else
-	{
-		curl_multi_socket_action(curlm_, CURL_SOCKET_TIMEOUT, 0, &runningHandles_);
-		check_multi_info();
-	}
-	
-}
-
 int createEventfd()
 {
 	int evtfd = ::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
@@ -188,14 +34,12 @@ int createEventfd()
 	return evtfd;
 }
 
-CurlManager::CurlManager(EventLoop* loop)
-	: loop_(loop),
-	  curl_evmgr_(new CurlEvMgr(loop)),
-	  wakeupFd_(createEventfd()),
-      wakeupChannel_(new Channel(loop, wakeupFd_)),
+CurlManager::CurlManager()
+	: wakeupFd_(createEventfd()),
 	  curlm_(CHECK_NOTNULL(curl_multi_init())),
 	  runningHandles_(0),
-	  prevRunningHandles_(0)
+	  prevRunningHandles_(0),
+	  stopped_(false)
 {
 	curl_multi_setopt(curlm_, CURLMOPT_SOCKETFUNCTION, &CurlManager::curlmSocketOptCb);
 	curl_multi_setopt(curlm_, CURLMOPT_SOCKETDATA, this);
@@ -206,17 +50,212 @@ CurlManager::CurlManager(EventLoop* loop)
 	//if (maxtotalconns > 0) curl_multi_setopt(curlm_, CURLMOPT_MAX_TOTAL_CONNECTIONS, maxtotalconns);
 	//if (maxhostconns > 0) curl_multi_setopt(curlm_, CURLMOPT_MAX_HOST_CONNECTIONS, maxhostconns);
 	//if (maxconns > 0) curl_multi_setopt(curlm_, CURLMOPT_MAXCONNECTS, maxconns);
-
-	// 设置唤醒回调
-	wakeupChannel_->setReadCallback(std::bind(&CurlManager::onRecvWakeUpNotify, this));
-	loop_->runInLoop(std::bind(&Channel::enableReading, get_pointer(wakeupChannel_)));
 }
 
 CurlManager::~CurlManager()
 {
-	// 析构要注意定时器，loop等安全退出
-	//cancelTimer();
 	curl_multi_cleanup(curlm_);
+}
+
+int CurlManager::runCurlEvLoop(const std::shared_ptr<CountDownLatch>& latch)
+{
+	// 初始化evbase
+	if(NULL != (evInfo_.evbase = event_base_new()))
+	{
+		LOG_INFO << "event_base_new:" << evInfo_.evbase;
+
+		// 注册唤醒事件并加入事件循环
+		int nRet = event_assign(&evInfo_.wakeup_event, evInfo_.evbase, wakeupFd_, EV_READ|EV_PERSIST, &CurlManager::onRecvWakeUpNotify, this);
+		LOG_INFO << "event_assign wakeup event:" << nRet;
+		
+		// 加入事件循环
+		nRet = event_add(&evInfo_.wakeup_event, NULL);
+		LOG_INFO << "event_add wakeup event:" << nRet;
+
+		// 注册一个定时事件,用于curl的超时处理
+		nRet = evtimer_assign(&evInfo_.timer_event, evInfo_.evbase, &CurlManager::onRecvEvTimerNotify, this);
+		LOG_INFO << "evtimer_assign curl timecb:" << nRet;
+		
+		// 注册一个定时事件,用于request的超时未回调处理
+		//nRet = evtimer_assign(&evInfo_.request_timeout_event, evInfo_.evbase, &CurlManager::onRecvEvTimerNotify, this);
+		//LOG_INFO << "evtimer_assign request timeout event:" << nRet;
+
+		latch->countDown();
+		
+		// 开启事件循环(阻塞的....当调用event_base_loopbreak() or event_base_loopexit() 时才返回)
+		nRet = event_base_dispatch(evInfo_.evbase);
+		LOG_INFO << "event_base_dispatch return:" << nRet << ",evloop exit";
+				
+		// 循环退出时析构evloop
+		event_del(&evInfo_.wakeup_event);
+		close(wakeupFd_);
+		event_del(&evInfo_.timer_event);
+		//event_del(&evInfo_.request_timeout_event);
+		event_base_free(evInfo_.evbase);
+	}
+
+	return 0;
+}
+
+int CurlManager::curlmSocketOptCb(CURL* c, int fd, int what, void* userp, void* socketp)
+{
+	if (userp)
+	{
+		CurlManager* cm = static_cast<CurlManager*>(userp);
+		cm->handleCurlmSocketOptCb(c, fd, what, socketp);
+	}
+	
+	return 0;
+}
+
+void CurlManager::handleCurlmSocketOptCb(CURL* c, int fd, int what, void* socketp)
+{
+	const char *whatstr[]={ "none", "IN", "OUT", "INOUT", "REMOVE" };
+
+	LOG_DEBUG << "cm:" << this << ",curl:" << c << ",fd:" << fd << ",socketp:" << socketp << ",what:" << whatstr[what];
+	
+	SockInfo* sInfo = static_cast<SockInfo*>(socketp);
+
+	if (what == CURL_POLL_REMOVE && !sInfo)
+	{
+		remsock(sInfo);
+	}
+	else
+	{
+		if (!sInfo)
+		{
+			addsock(fd, c, what, &evInfo_);
+		}
+		else
+		{
+			setsock(sInfo, fd, c, what, &evInfo_);
+		}
+	}
+
+}
+
+void CurlManager::addsock(int fd, CURL* c, int action, EvLoopInfo* evInfo)
+{
+	SockInfo* sInfo = static_cast<SockInfo*>(malloc(sizeof(SockInfo)));
+	if (sInfo)
+	{
+		memset(sInfo, 0, sizeof(SockInfo));
+
+		setsock(sInfo, fd, c, action, evInfo);
+
+		curl_multi_assign(curlm_, fd, sInfo);
+	}
+	else
+	{
+		LOG_ERROR << "malloc sockinfo fail";
+	}
+}
+
+/* Assign information to a SockInfo structure */
+void CurlManager::setsock(SockInfo* sInfo, int fd, CURL* c, int action, EvLoopInfo* evInfo)
+{
+	short evtp = static_cast<short>((action&CURL_POLL_IN?EV_READ:0)|(action&CURL_POLL_OUT?EV_WRITE:0)|EV_PERSIST);
+	if (sInfo && c && evInfo)
+	{
+		sInfo->fd = fd;
+		sInfo->action = action;
+		sInfo->easy = c;
+
+		if (event_initialized(&sInfo->ev)) 
+		{
+			event_del(&sInfo->ev);
+		}
+	
+		event_assign(&sInfo->ev, evInfo->evbase, fd, evtp, onRecvEvOptNotify, this);
+		event_add(&sInfo->ev, NULL);
+	}	
+}
+
+/* Clean up the SockInfo structure */
+void CurlManager::remsock(SockInfo* sInfo)
+{
+	if (sInfo)
+	{
+		if (event_initialized(&sInfo->ev))
+		{
+			event_del(&sInfo->ev);
+		}
+
+		free(sInfo);
+	}
+}
+
+int CurlManager::curlmTimerCb(CURLM* curlm, long ms, void* userp)
+{
+	LOG_DEBUG << "CurlManager::curlmTimerCb";
+	
+	if (userp)
+	{
+		CurlManager* cm = static_cast<CurlManager*>(userp);
+		cm->handleCurlmTimerCb(ms);
+	}
+	return 0;
+}
+
+void CurlManager::handleCurlmTimerCb(long ms)
+{
+	struct timeval timeout;
+	timeout.tv_sec = ms / 1000;
+	timeout.tv_usec = (ms % 1000)*1000;
+	
+	if (ms == 0)
+	{
+		curl_multi_socket_action(curlm_, CURL_SOCKET_TIMEOUT, 0, &runningHandles_);
+	}
+	else if (ms == -1)
+	{
+		evtimer_del(&evInfo_.timer_event);
+	}
+	else
+	{
+		evtimer_add(&evInfo_.timer_event, &timeout);
+	}
+}
+
+void CurlManager::onRecvEvTimerNotify(int fd, short evtp, void *arg)
+{
+	if (arg)
+	{
+		CurlManager* cm = static_cast<CurlManager*>(arg);
+		cm->handleEvTimerCb();
+	}
+}
+
+void CurlManager::handleEvTimerCb()
+{
+	curl_multi_socket_action(curlm_, CURL_SOCKET_TIMEOUT, 0, &runningHandles_);
+	check_multi_info();
+}
+
+void CurlManager::onRecvEvOptNotify(int fd, short evtp, void *arg)
+{
+	if (arg)
+	{
+		CurlManager* cm = static_cast<CurlManager*>(arg);
+		cm->handleEvOptCb(fd, evtp);
+	}
+}
+
+void CurlManager::handleEvOptCb(int fd, short evtp)
+{
+	int action = (evtp & EV_READ ? CURL_POLL_IN : 0) | (evtp & EV_WRITE ? CURL_POLL_OUT : 0);
+
+	curl_multi_socket_action(curlm_, fd, action, &runningHandles_);
+
+	check_multi_info();
+	
+	if (runningHandles_ <= 0)
+	{
+		if (evtimer_pending(&evInfo_.timer_event, NULL))
+		{
+			evtimer_del(&evInfo_.timer_event);
+		}
+	}
 }
 
 CurlRequestPtr CurlManager::getRequest(const std::string& url, bool bKeepAlive, int req_type, int http_ver)
@@ -239,23 +278,27 @@ CurlRequestPtr CurlManager::getRequest(const std::string& url, bool bKeepAlive, 
 		
 	return p;
 }
-// 判断事件循环中是否还有未完成事件
-size_t CurlManager::isLoopRunning()
-{
-	return loop_->queueSize();
-}
 
 void CurlManager::notifySendRequest()
 {
 	uint64_t one = 1;
-	sockets::write(wakeupFd_, &one, sizeof one);
+	write(wakeupFd_, &one, sizeof one);
 }
 
-void CurlManager::onRecvWakeUpNotify()
+void CurlManager::onRecvWakeUpNotify(int fd, short evtp, void *arg)
 {
+	if (arg)
+	{
+		CurlManager* cm = static_cast<CurlManager*>(arg);
+		cm->handleWakeUpCb();
+	}
+}
+
+void CurlManager::handleWakeUpCb()
+{	
 	uint64_t one = 1;
-	sockets::read(wakeupFd_, &one, sizeof one);
-	
+	read(wakeupFd_, &one, sizeof one);
+
 	// 唤醒后，从待发队列中取数据发送
 	checkNeedSendRequest();
 }
@@ -289,29 +332,19 @@ int CurlManager::sendRequest(const CurlRequestPtr& request)
 
 void CurlManager::sendRequestInLoop(const CurlRequestPtr& request)
 {
+	/*
 	// 启一个内部定时器检测超时，以防curl不回调，超时时间在curl基础上增加3秒
-	long tm = request->entire_timeout_+3;
-	request->timerid_ = loop_->runAfter(static_cast<int>(tm)/1.0, 
-						std::bind(&CurlManager::innerTimerTimeOut, shared_from_this(), request->getReqUUID()));
+	long tm = request->entire_timeout_ + 3;
+	struct timeval timeout;
+	timeout.tv_sec = tm / 1000;
+	timeout.tv_usec = (tm % 1000) * 1000;
+
+	evtimer_add(&evInfo_.request_timeout_event, &timeout);
+	*/
 	// 先加入发送中
 	HttpRequesting::GetInstance().add(request);
 	// 发送请求
-	request->request(this, curlm_, loop_);
-}
-
-void CurlManager::onReadEventCallBack(int fd)
-{
-	LOG_DEBUG << "onReadEventCallBack";
-
-	curl_multi_socket_action(curlm_, fd, CURL_POLL_IN, &runningHandles_);
-	check_multi_info();
-}
-
-void CurlManager::onWriteEventCallBack(int fd)
-{
-	LOG_DEBUG << "onWriteEventCallBack";
-	curl_multi_socket_action(curlm_, fd, CURL_POLL_OUT, &runningHandles_);
-	check_multi_info();
+	request->request(this, curlm_);
 }
 
 void CurlManager::check_multi_info()
@@ -343,12 +376,17 @@ void CurlManager::check_multi_info()
 		checkNeedSendRequest();
 	}
 	prevRunningHandles_ = runningHandles_;
-}
 
+	// 没有在等待处理的事件时才可以退出
+	if (runningHandles_ <= 0 && stopped_)
+	{
+		event_base_loopbreak(evInfo_.evbase);
+	}
+}
 void CurlManager::afterRequestDone(const CurlRequestPtr& request)
 {
-	// 移除内部定时器
-	loop_->cancel(request->timerid_);
+	// 移除request请求超时检测定时器
+	//evtimer_del(&evInfo_.request_timeout_event);
 	// 将请求移出管理器
 	removeMultiHandle(request);
 	// 回收请求,视情况而定是回收重用还是直接释放
@@ -357,6 +395,7 @@ void CurlManager::afterRequestDone(const CurlRequestPtr& request)
 
 void CurlManager::forceCancelRequest(uint64_t req_uuid)
 {
+	/*
 	LOG_DEBUG << "CurlManager::forceCancelRequest " << req_uuid;
 
 	CurlRequestPtr request = HttpRequesting::GetInstance().find(req_uuid);
@@ -371,11 +410,13 @@ void CurlManager::forceCancelRequest(uint64_t req_uuid)
 		// 回调中断请求
 		loop_->queueInLoop(std::bind(&CurlRequest::done, request, 10055, "Request aborted manually"));
 	}
+	*/
 }
 
 // 处理中断请求(内部调用)
 void CurlManager::forceCancelRequestInner(const CurlRequestPtr& request)
 {
+	/*
 	LOG_DEBUG << "req_uuid = " << request->getReqUUID();
 	
 	// 移除内部定时器
@@ -384,11 +425,13 @@ void CurlManager::forceCancelRequestInner(const CurlRequestPtr& request)
 	removeMultiHandle(request);
 	// 回调中断请求
 	loop_->queueInLoop(std::bind(&CurlRequest::done, request, 10055, "Request aborted manually"));
+	*/
 }
 
 // 内部定时器超时响应函数
 void CurlManager::innerTimerTimeOut(uint64_t req_uuid)
 {
+	/*
 	LOG_DEBUG << "CurlManager::innerTimerTimeOut";
 
 	CurlRequestPtr request = HttpRequesting::GetInstance().find(req_uuid);
@@ -402,6 +445,7 @@ void CurlManager::innerTimerTimeOut(uint64_t req_uuid)
 		loop_->queueInLoop(std::bind(&CurlRequest::done, request, 10028, "Timer of httpclient was reached"));
 		//request->done(10028, "Inner Timer TimeOut");
 	}
+	*/
 }
 
 // 将请求移出管理器

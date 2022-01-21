@@ -70,6 +70,7 @@ include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${PROJECT_SOURCE_DIR})
 
 include_directories(${PROJECT_SOURCE_DIR}/mwnet_mt/include)
+include_directories(${PROJECT_SOURCE_DIR}/mwnet_mt/include/libevent)
 link_directories(${PROJECT_SOURCE_DIR}/mwnet_mt/lib)
 
 string(TOUPPER ${CMAKE_BUILD_TYPE} BUILD_TYPE)

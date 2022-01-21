@@ -217,7 +217,7 @@ public:
 						bool WaitOrReturnIfOverMaxTotalConns=false); /*超过总的最大并发数后，选择阻塞等待还是直接返回失败*/ 
 																	 /*false:直接失败 true:阻塞等待并发减少后再发送*/	 
 	
-	// 取消请求，当请求未发送或已发送但还没回应时有效，会通过回调函数返回
+	// 取消请求，当请求未发送或已发送但还没回应时有效，会通过回调函数返回--暂未实现
 	void CancelHttpRequest(const HttpRequestPtr& request);
 
 	// 获取待回应数量
@@ -236,7 +236,6 @@ private:
 	// 回调函数
 	pfunc_onmsg_cb m_pfunc_onmsg_cb;
 	// mainloop
-	boost::any main_loop_;
 	// ioloop
 	boost::any io_loop_;
 	// latch

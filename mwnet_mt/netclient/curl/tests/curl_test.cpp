@@ -267,11 +267,11 @@ int main(int argc, char* argv[])
 
 	http_cli.reset(new CurlHttpClient());
 	//初始化httpclient
-	http_cli->InitHttpClient(NULL, func_onmsg_cb, 4, max_conn, max_conn);
+	http_cli->InitHttpClient(NULL, func_onmsg_cb, 8, max_conn, max_conn);
 	//初始化并启动发送线程
 	ThreadPoolPtr pPool(new mwnet_mt::ThreadPool("testcurl"));
 	pPool->setMaxQueueSize(10000);
-	pPool->start(1);
+	pPool->start(8);
 
 	//loop test.......
 	int64_t ttmp = 0;

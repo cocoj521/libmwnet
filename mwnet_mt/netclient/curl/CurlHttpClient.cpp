@@ -6,16 +6,14 @@
 #include <mwnet_mt/base/Logging.h>
 #include <mwnet_mt/base/CountDownLatch.h>
 #include <mwnet_mt/base/Condition.h>
-#include <mwnet_mt/net/EventLoop.h>
-#include <mwnet_mt/net/EventLoopThread.h>
-#include <mwnet_mt/net/EventLoopThreadPool.h>
+#include <mwnet_mt/base/Thread.h>
+#include <mwnet_mt/base/ThreadPool.h>
 
 #ifdef LIB_VERSION
 const char *pVer = LIB_VERSION;
 #endif
 
 using namespace mwnet_mt;
-using namespace mwnet_mt::net;
 using namespace curl;
 
 namespace MWNET_MT
@@ -264,8 +262,8 @@ const std::string& HttpResponse::GetRedirectUrl() const
 {
 	return m_strRedirectUrl;
 }
-
-typedef std::shared_ptr<EventLoopThread> EventLoopThreadPtr;
+typedef std::shared_ptr<Thread> ThreadPtr;
+typedef std::shared_ptr<ThreadPool> ThreadPoolPtr;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 //   CurlHttpClient
@@ -273,7 +271,6 @@ typedef std::shared_ptr<EventLoopThread> EventLoopThreadPtr;
 CurlHttpClient::CurlHttpClient() :
 	m_pInvoker(NULL),
 	m_pfunc_onmsg_cb(NULL),
-	main_loop_(nullptr),
 	io_loop_(nullptr),
 	MaxTotalConns_(10000),
 	MaxHostConns_(20),	
@@ -282,16 +279,6 @@ CurlHttpClient::CurlHttpClient() :
 	exit_(false)
 {
 	total_req_ = 0;
-	// 申请一个线程将loop跑在线程里
-	EventLoopThreadPtr pLoopThr(new EventLoopThread(NULL, "mHttpCliMain"));
-	EventLoop* pLoop = pLoopThr->startLoop();
-	if (pLoop)
-	{
-		// 保存mainloop
-		main_loop_ = pLoopThr;
-	}
-	// 初始化curl库
-	CurlManager::initialize(CurlManager::kCURLssl);
 }
 
 CurlHttpClient::~CurlHttpClient()
@@ -344,6 +331,12 @@ void CurlHttpClient::DoneCallBack(const boost::any& _any, int errCode, const cha
 	}
 }
 
+// IO线程池初始化成功回调函数
+static void func_IoThrInit(const std::shared_ptr<CountDownLatch>& latch)
+{
+	latch->countDown();
+}
+
 bool CurlHttpClient::InitHttpClient(void* pInvoker,
 									pfunc_onmsg_cb pFnOnMsg,
 									int nIoThrNum,
@@ -353,42 +346,49 @@ bool CurlHttpClient::InitHttpClient(void* pInvoker,
 {
 	bool bRet = false;	
 
-	m_pInvoker = pInvoker;
-	m_pfunc_onmsg_cb = pFnOnMsg;
-	MaxTotalConns_ = nMaxTotalConns;
-	MaxHostConns_ = nMaxHostConns;
-	IoThrNum_ = nIoThrNum;
-	nMaxReqQueSize>nMaxTotalConns?nMaxReqQueSize=nMaxTotalConns:1;
-	MaxReqQueSize_   = nMaxReqQueSize;
-	total_req_ = 0;
-	wait_rsp_ = 0;
-
-	HttpRequesting::GetInstance().setMaxSize(MaxTotalConns_, MaxHostConns_);
-	HttpWaitRequest::GetInstance().setMaxSize(MaxReqQueSize_);
-	HttpRecycleRequest::GetInstance().setMaxSize(MaxTotalConns_);
-
-	EventLoopThreadPtr main_loop(boost::any_cast<EventLoopThreadPtr>(main_loop_));
-	if (main_loop)
+	// 创建IO线程池
+	ThreadPoolPtr pIoThr(new ThreadPool("mHttpCliIo"));
+	if (pIoThr)
 	{
-		EventLoop* pMainLoop = main_loop->getloop();
-		// 创建并启动IO线程
-		std::shared_ptr<EventLoopThreadPool> io_loop(new EventLoopThreadPool(pMainLoop, "mHttpCliIo"));
-		io_loop->setThreadNum(nIoThrNum);
+		m_pInvoker = pInvoker;
+		m_pfunc_onmsg_cb = pFnOnMsg;
+		MaxTotalConns_ = nMaxTotalConns;
+		MaxHostConns_ = nMaxHostConns;
+		IoThrNum_ = nIoThrNum;
+		nMaxReqQueSize > nMaxTotalConns ? nMaxReqQueSize = nMaxTotalConns : 1;
+		MaxReqQueSize_ = nMaxReqQueSize;
+		total_req_ = 0;
+		wait_rsp_ = 0;
+
+		HttpRequesting::GetInstance().setMaxSize(MaxTotalConns_, MaxHostConns_);
+		HttpWaitRequest::GetInstance().setMaxSize(MaxReqQueSize_);
+		HttpRecycleRequest::GetInstance().setMaxSize(MaxTotalConns_);
+
 		// 保存io_loop
-		io_loop_ = io_loop;
+		io_loop_ = pIoThr;
+
+		// 启动线程池
+		std::shared_ptr<CountDownLatch> latch(new CountDownLatch(nIoThrNum));
+		latch_ = latch;
+		pIoThr->setThreadInitCallback(std::bind(func_IoThrInit, latch));		
+		pIoThr->start(nIoThrNum);
+		latch->wait();
 		
-		std::shared_ptr<CountDownLatch> latchPtr(new CountDownLatch(nIoThrNum));
-		latch_ = latchPtr;
 		std::shared_ptr<MutexLock> mutexPtr(new MutexLock());
 		mutexLock_ = mutexPtr;
 		std::shared_ptr<Condition> conditionPtr(new Condition(*mutexPtr));
 		condition_ = conditionPtr;
-
-		pMainLoop->runInLoop(std::bind(&CurlHttpClient::Start, this));
-
-		latchPtr->wait();
-
-		exit_ = false;
+				
+		// 初始化curl库
+		CurlManager::initialize(CurlManager::kCURLssl);
+		
+		// 将curl管理器跑在线程池里
+		latch->resetCount(nIoThrNum);
+		for (int i = 0; i < IoThrNum_; i++)
+		{
+			pIoThr->run(std::bind(&CurlHttpClient::Start, this));
+		}
+		latch->wait();
 		
 		bRet = true;
 	}
@@ -397,20 +397,10 @@ bool CurlHttpClient::InitHttpClient(void* pInvoker,
 
 void CurlHttpClient::Start()
 {
-	std::shared_ptr<EventLoopThreadPool> io_loop(boost::any_cast<std::shared_ptr<EventLoopThreadPool>>(io_loop_));
-	if (io_loop)
-	{
-		io_loop->start();
-		std::shared_ptr<CountDownLatch> latchPtr(boost::any_cast<std::shared_ptr<CountDownLatch>>(latch_));
-		httpclis_.clear();
-		// 初始化若干个curl对象
-		for (int i = 0; i < IoThrNum_; i++)
-		{
-			std::shared_ptr<CurlManager> curlm(new CurlManager(io_loop->getNextLoop()));
-			httpclis_.push_back(curlm);
-			latchPtr->countDown();
-		}
-	}
+	std::shared_ptr<CountDownLatch> latch(boost::any_cast<std::shared_ptr<CountDownLatch>>(latch_));
+	std::shared_ptr<CurlManager> curlm(new CurlManager());
+	httpclis_.push_back(curlm);
+	curlm->runCurlEvLoop(latch);
 }
 
 //获取HttpRequest
@@ -420,7 +410,7 @@ HttpRequestPtr CurlHttpClient::GetHttpRequest(const std::string& strUrl, HTTP_VE
 	CurlRequestPtr curl_request = CurlManager::getRequest(strUrl, bKeepAlive, req_type, http_ver);
 	
 	// 设置完成回调
-	curl_request->setDoneCallback(std::bind(&CurlHttpClient::DoneCallBack,this, _1, _2, _3));
+	curl_request->setDoneCallback(std::bind(&CurlHttpClient::DoneCallBack, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
 	//std::placeholders::_1
 	
 	// 生成httprequest
@@ -479,11 +469,13 @@ int  CurlHttpClient::SendHttpRequest(const HttpRequestPtr& request, const boost:
 
 void CurlHttpClient::CancelHttpRequest(const HttpRequestPtr& request)
 {
+	/*
 	CurlRequestPtr curl_req = boost::any_cast<CurlRequestPtr>(request->GetContext());
 	if (curl_req)
 	{
 		curl_req->forceCancel();
 	}
+	*/
 }
 
 // 获取待回应数量

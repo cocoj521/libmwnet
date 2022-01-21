@@ -2,16 +2,34 @@
 #define __CURL_CURLMANAGER_H__
 
 #include "CurlRequest.h"
-#include "CurlEvMgr.h"
-#include <mwnet_mt/net/TimerId.h>
+#include <mwnet_mt/base/CountDownLatch.h>
 #include <mutex>
 #include <map>
 #include <list>
+#include <event2/event.h>
+#include <event2/event_struct.h>
 
-using namespace mwnet_mt;
-using namespace mwnet_mt::net;
 namespace curl
 {
+
+typedef struct _EvLoopInfo
+{
+	struct event_base* evbase;
+	struct event wakeup_event;
+	struct event timer_event;
+	//struct event request_timeout_event; //todo:超时检测
+} EvLoopInfo;
+
+/* Information associated with a specific socket */
+typedef struct _SockInfo
+{
+	int fd;
+	CURL* easy;
+	int action;
+	long timeout;
+	struct event ev;
+	EvLoopInfo *evInfo;
+} SockInfo;
 
 /**
  * curlm句柄的管理者，可管理多个简单句柄
@@ -30,7 +48,7 @@ public:
 	 * [CurlManager 构造函数]
 	 * @param  loop [epoll的事件循环器]
 	 */
-	explicit CurlManager(EventLoop* loop);
+	explicit CurlManager();
 	~CurlManager();
 
 	/**
@@ -43,6 +61,9 @@ public:
 	// 获取一个请求对象
 	static CurlRequestPtr getRequest(const std::string& url, bool bKeepAlive, int req_type, int http_ver);
 
+	// 启动curl事件循环（启动事件循环等，该函数阻塞，不会返回，需要放在线程中运行）
+	int runCurlEvLoop(const std::shared_ptr<CountDownLatch>& latch);
+	
 	// 发送请求
 	//0:成功 1:尚未初始化 2:发送缓冲满 3:超过总的最大并发数
 	int sendRequest(const CurlRequestPtr& request);
@@ -52,30 +73,40 @@ public:
 	// 处理中断请求(内部调用)
 	void forceCancelRequestInner(const CurlRequestPtr& request);
 
-	/**
-	 * [读事件的响应函数]
-	 * @param fd [事件的套接口]
-	 */
-	void onReadEventCallBack(int fd);
-	
-	/**
-	 * [写事件的响应函数]
-	 * @param fd [事件的套接口]
-	 */
-	void onWriteEventCallBack(int fd);
+	// wakeup
+	static void onRecvWakeUpNotify(int fd, short evtp, void *arg);
+	void handleWakeUpCb();
 
-	void onCloseEventCallBack(int fd);
-	
-	void onErrEventCallBack(int fd);
+	// evtimer
+	static void onRecvEvTimerNotify(int fd, short evtp, void *arg);
+	void handleEvTimerCb();
 
-	// 判断事件循环中是否还有未完成事件
-	size_t isLoopRunning();
+	// ev事件操作通知
+	static void onRecvEvOptNotify(int fd, short evtp, void *arg);
+	void handleEvOptCb(int fd, short evtp);
 
-	size_t loopSize() { return loop_->queueSize(); };
+	// request请求超时事件操作通知
+	static void onRequestTimeOutNotify(int fd, short evtp, void *arg);
+	void handleRequestTimeCb(int fd, short evtp);
+
+	// curlm socket事件回调CURLMOPT_SOCKETFUNCTION CURL_POLL_IN/OUT/INOUT/REMOVE
+	static int curlmSocketOptCb(CURL* c, int fd, int what, void* userp, void* socketp);
+	void handleCurlmSocketOptCb(CURL* c, int fd, int what, void* socketp);
+
+	// curlm超时回调函数CURLMOPT_TIMERFUNCTION
+	static int curlmTimerCb(CURLM* curlm, long ms, void* userp);
+	void handleCurlmTimerCb(long ms);
+
+	void addsock(int fd, CURL* c, int action, EvLoopInfo* evInfo);
+
+	/* Assign information to a SockInfo structure */
+	void setsock(SockInfo* sinfo, int fd, CURL* c, int action, EvLoopInfo* evInfo);
+
+	/* Clean up the SockInfo structure */
+	void remsock(SockInfo* sinfo);
 private:
 	// 通知发送
 	void notifySendRequest();
-	void onRecvWakeUpNotify();
 	
 	/**
 	 * [check_multi_info 核实请求是否已经完成]
@@ -100,37 +131,21 @@ private:
 	// 内部定时器超时响应函数
 	void innerTimerTimeOut(uint64_t req_uuid);
 
-	// curlm socket事件回调CURLMOPT_SOCKETFUNCTION CURL_POLL_IN/OUT/INOUT/REMOVE
-	static int curlmSocketOptCb(CURL* c, int fd, int what, void* userp, void* socketp);
-	int curlmSocketOptCbInLoop(CURL* c, int fd, int what, void* socketp);
-	void addEvLoop(void* p, int fd, int what);
-	void optEvLoop(void* p, int fd, int what);
-	void delEvLoop(void* p, int fd, int what);
-	void delEv(void* p);
-	
-	// curlm超时回调函数CURLMOPT_TIMERFUNCTION
-	static int curlmTimerCb(CURLM* curlm, long ms, void* userp);
-	void curlmTimerCbInLoop(long ms);
-	void createTimer(long ms);
-	void cancelTimer();
 	
 private:
-	// 事件循环器
-	EventLoop* loop_;
 	// 事件管理器
-	std::shared_ptr<CurlEvMgr> curl_evmgr_;
 	// 唤醒FD
 	int wakeupFd_;
-	// 唤醒通道
-	std::shared_ptr<Channel> wakeupChannel_;
 	// 多路句柄管理器
 	CURLM* curlm_;
 	// 记录正在被监控的简单句柄的总个数
 	int runningHandles_;
 	// 记录上一次监控的简单句柄的总个数
 	int prevRunningHandles_;
-	// 定时器ID
-	TimerId timerid_;
+	// 停止标记
+	bool stopped_;
+	// 事件循环器
+	EvLoopInfo evInfo_;
 };
 
 } // end namespace curl
