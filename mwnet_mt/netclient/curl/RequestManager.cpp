@@ -193,6 +193,7 @@ void HttpRecycleRequest::setMaxSize(int max_recycle_cnt)
 void HttpRecycleRequest::recycle(const CurlRequestPtr& request)
 {
 	std::lock_guard<std::mutex> lock(mutex_recycle_request_);
+	//request->delContext();
 	// 保持recycle队列的大小不超出设定的值
 	if (list_size_ >= max_recycle_cnt_)
 	{

@@ -94,6 +94,12 @@ public:
 	const boost::any& getContext() const
 	{ return context_; }
 
+	void delContext()
+	{
+		boost::any a;
+		context_ = a;
+	}
+
 	/**
 	 * [setReqUUID 设置它在所在管理类的唯一标识req_uuid的值]
 	 * @param req_uuid [64位整数的值，在它的管理类中需要保持唯一性]

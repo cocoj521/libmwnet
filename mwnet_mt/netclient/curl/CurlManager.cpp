@@ -50,6 +50,8 @@ CurlManager::CurlManager()
 	//if (maxtotalconns > 0) curl_multi_setopt(curlm_, CURLMOPT_MAX_TOTAL_CONNECTIONS, maxtotalconns);
 	//if (maxhostconns > 0) curl_multi_setopt(curlm_, CURLMOPT_MAX_HOST_CONNECTIONS, maxhostconns);
 	//if (maxconns > 0) curl_multi_setopt(curlm_, CURLMOPT_MAXCONNECTS, maxconns);
+	//curl_multi_setopt(curlm_, CURLMOPT_MAX_HOST_CONNECTIONS, 100);
+	curl_multi_setopt(curlm_, CURLMOPT_MAXCONNECTS, 100);
 }
 
 CurlManager::~CurlManager()
@@ -116,7 +118,7 @@ void CurlManager::handleCurlmSocketOptCb(CURL* c, int fd, int what, void* socket
 	
 	SockInfo* sInfo = static_cast<SockInfo*>(socketp);
 
-	if (what == CURL_POLL_REMOVE && !sInfo)
+	if (what == CURL_POLL_REMOVE && sInfo)
 	{
 		remsock(sInfo);
 	}
@@ -139,6 +141,8 @@ void CurlManager::addsock(int fd, CURL* c, int action, EvLoopInfo* evInfo)
 	SockInfo* sInfo = static_cast<SockInfo*>(malloc(sizeof(SockInfo)));
 	if (sInfo)
 	{
+		LOG_DEBUG << "malloc sInfo";
+
 		memset(sInfo, 0, sizeof(SockInfo));
 
 		setsock(sInfo, fd, c, action, evInfo);
@@ -147,7 +151,7 @@ void CurlManager::addsock(int fd, CURL* c, int action, EvLoopInfo* evInfo)
 	}
 	else
 	{
-		LOG_ERROR << "malloc sockinfo fail";
+		LOG_ERROR << "malloc sInfo fail";
 	}
 }
 
@@ -182,6 +186,8 @@ void CurlManager::remsock(SockInfo* sInfo)
 		}
 
 		free(sInfo);
+
+		LOG_DEBUG << "free sInfo";
 	}
 }
 
@@ -274,8 +280,8 @@ CurlRequestPtr CurlManager::getRequest(const std::string& url, bool bKeepAlive, 
 		p->initCurlRequest(url, req_uuid, bKeepAlive, req_type, http_ver);
 	}
 
-	LOG_DEBUG << " CurlRequestPtr = " << p.get() << " req_uuid = " << req_uuid;
-		
+	LOG_DEBUG << "getRequest CurlRequestPtr = " << p.get() << " req_uuid = " << req_uuid;
+
 	return p;
 }
 

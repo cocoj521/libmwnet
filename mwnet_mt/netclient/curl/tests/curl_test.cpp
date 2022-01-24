@@ -95,9 +95,30 @@ std::string get_httpurl(const char* szPhone)
 	printf("req:%s\n", szBuf);
 	return std::string(szBuf);
 }
+void testNormal(int post_get, const std::string& strHttpUrl, const std::string& strHttpBody)
+{
+	std::string strBodyTmp = strHttpBody;
+	HttpRequestPtr http_request = http_cli->GetHttpRequest(strHttpUrl,
+														HTTP_1_1,
+														1 == post_get ? HTTP_REQUEST_POST : HTTP_REQUEST_GET,
+														g_nKeepAlive);
+	if (http_request)
+	{
+		LOG_DEBUG << "GetHttpRequest:" << http_request->GetReqUUID();
+		http_request->SetContentType("text/plain");
+		http_request->SetTimeOut(30, 60);
+		http_request->SetBody(strBodyTmp);
+		boost::any params;
+		int nRet = http_cli->SendHttpRequest(http_request, params, true);
+		if (0 != nRet)
+		{
+			LOG_ERROR << "SendHttpRequest Error:" << nRet;
+		}
+	}
+}
 //http://msg-aim.monyun.cn:9319/ApiService/v1/AddressManage/queryAimAbility
 // 线程任务函数
-void test(int post_get, const std::string& strHttpUrl, const std::string& strHttpBody)
+void testAim(int post_get, const std::string& strHttpUrl, const std::string& strHttpBody)
 {
 
 	std::string strBodyTmp = strHttpBody;
@@ -136,7 +157,7 @@ void test(int post_get, const std::string& strHttpUrl, const std::string& strHtt
 		
 		http_request->SetBody(strBodyTmp);
 		
-		boost::any params(http_request);
+		boost::any params;
 		int nRet = http_cli->SendHttpRequest(http_request, params, true);
 		if (0 != nRet)
 		{
@@ -189,7 +210,7 @@ void testTextMatchSvr(int post_get, const std::string& strHttpUrl, const std::st
 
 		http_request->SetBody(strBodyTmp);
 
-		boost::any params(http_request);
+		boost::any params;
 		int nRet = http_cli->SendHttpRequest(http_request, params, true);
 		if (0 != nRet)
 		{
@@ -247,19 +268,40 @@ int main(int argc, char* argv[])
 	printf("test loop cnt:\n");
 	scanf("%ld", &totalsend);
 
-	printf("loop cnt:%ld\n", totalsend);
+	int nIoThr = 8;
+	printf("IoThrNum:\n");
+	scanf("%d", &nIoThr);
+
+	int nWorkThr = 8;
+	printf("WorkThrNum:\n");
+	scanf("%d", &nWorkThr);
+
+	int nLogLevel = 2;
+	printf("LogLevel 0-TRACE 1-DEBUG 2-INFO:\n");
+	scanf("%d", &nLogLevel);
 
 	printf("input http url:\n");
 	scanf("%s", g_szHttpUrl);
 
 	printf("input http body:\n");
 	scanf("%s", g_szHttpBody);
-
+	
 	if (!bPrintLog)
 	{
 		mkdir("./curltestlogs", 0755);
 		if (!g_logFile) g_logFile.reset(new mwnet_mt::LogFile("./curltestlogs/", "curltestlog", 1024 * 1024 * 1024, true, 0, 1));
-		mwnet_mt::Logger::setLogLevel(mwnet_mt::Logger::LogLevel::INFO);
+		if (0 == nLogLevel)
+		{
+			mwnet_mt::Logger::setLogLevel(mwnet_mt::Logger::LogLevel::TRACE);
+		}
+		else if (1 == nLogLevel)
+		{
+			mwnet_mt::Logger::setLogLevel(mwnet_mt::Logger::LogLevel::DEBUG);
+		}
+		else if (2 == nLogLevel)
+		{
+			mwnet_mt::Logger::setLogLevel(mwnet_mt::Logger::LogLevel::INFO);
+		}
 		mwnet_mt::Logger::setOutput(outputFunc);
 		mwnet_mt::Logger::setFlush(flushFunc);
 		g_fp = fopen("./blk.txt","a+");
@@ -267,11 +309,11 @@ int main(int argc, char* argv[])
 
 	http_cli.reset(new CurlHttpClient());
 	//初始化httpclient
-	http_cli->InitHttpClient(NULL, func_onmsg_cb, 8, max_conn, max_conn);
+	http_cli->InitHttpClient(NULL, func_onmsg_cb, nIoThr, max_conn, max_conn);
 	//初始化并启动发送线程
 	ThreadPoolPtr pPool(new mwnet_mt::ThreadPool("testcurl"));
 	pPool->setMaxQueueSize(10000);
-	pPool->start(8);
+	pPool->start(nWorkThr);
 
 	//loop test.......
 	int64_t ttmp = 0;
@@ -314,7 +356,7 @@ int main(int argc, char* argv[])
 	while (ttmp < totalsend)
 	{
 		// loop add threadpool
-		if (pPool->TryRun(std::bind(testTextMatchSvr, post_get, g_szHttpUrl, g_szHttpBody)))
+		if (pPool->TryRun(std::bind(testNormal, post_get, g_szHttpUrl, g_szHttpBody)))
 		{
 			++ttmp;
 			//usleep(1);

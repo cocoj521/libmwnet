@@ -29,6 +29,7 @@ public:
 	CurlRequestPtr get(CURL* c);
 	void add(const CurlRequestPtr& request);
 	void remove(const CurlRequestPtr& request);
+	size_t size() { return requestings_.size(); }
 	bool isFull();
 	// 清空前会回调所有未返回的请求
 	void clear();
@@ -88,6 +89,7 @@ public:
 	void setMaxSize(int max_recycle_cnt);
 	void recycle(const CurlRequestPtr& request);
 	void clear();
+	int size(){ return list_size_; }
 private:
 	HttpRecycleRequest()
 	{

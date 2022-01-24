@@ -22,6 +22,7 @@ CurlRequest::CurlRequest(const std::string& url, uint64_t req_uuid, bool bKeepAl
 	  entire_timeout_(60)
 {
 	initCurlRequest(url, req_uuid, bKeepAlive, req_type, http_ver);
+	LOG_DEBUG << "curl_new";
 }
 
 void CurlRequest::initCurlRequest(const std::string& url, uint64_t req_uuid, bool bKeepAlive, int req_type, int http_ver)
@@ -99,8 +100,13 @@ void CurlRequest::initCurlRequest(const std::string& url, uint64_t req_uuid, boo
 	else
 	{
 		curl_easy_setopt(curl_, CURLOPT_TCP_KEEPALIVE, 1L);
-		curl_easy_setopt(curl_, CURLOPT_TCP_KEEPIDLE, 20L);
-		curl_easy_setopt(curl_, CURLOPT_TCP_KEEPINTVL, 10L);
+		curl_easy_setopt(curl_, CURLOPT_TCP_KEEPIDLE, 60L);
+		curl_easy_setopt(curl_, CURLOPT_TCP_KEEPINTVL, 3L);
+
+		//Limit the age(idle time) of connections for reuse.See CURLOPT_MAXAGE_CONN
+		//curl_easy_setopt(curl_, CURLOPT_MAXAGE_CONN, 30L);
+		//Limit the age(since creation) of connections for reuse.See CURLOPT_MAXLIFETIME_CONN
+		//curl_easy_setopt(curl_, CURLOPT_MAXLIFETIME_CONN, 30L);
 	}
 	
 	curl_easy_setopt(curl_, CURLOPT_WRITEFUNCTION, &CurlRequest::bodyDataCb);
@@ -119,8 +125,8 @@ void CurlRequest::initCurlRequest(const std::string& url, uint64_t req_uuid, boo
 
 	curl_easy_setopt(curl_, CURLOPT_NOSIGNAL, 1L);
 
-	//禁用全局dns cache
-	curl_easy_setopt(curl_, CURLOPT_DNS_USE_GLOBAL_CACHE, 0L);
+	//全局dns cache 60s
+	curl_easy_setopt(curl_, CURLOPT_DNS_USE_GLOBAL_CACHE, 60L);
 	
 	curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
 }
@@ -133,7 +139,7 @@ CurlRequest::~CurlRequest()
 	// 释放curl easy句柄
 	cleanCurlHandles();
 	
-	LOG_DEBUG  << "CurlRequest: ~CurlRequest";
+	LOG_DEBUG  << "curl_del";
 }
 
 // 清理curl句柄

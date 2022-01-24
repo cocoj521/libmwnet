@@ -29,10 +29,12 @@ HttpRequest::HttpRequest(const std::string& strUrl, HTTP_VERSION http_ver, HTTP_
 	  req_type_(req_type),
 	  http_ver_(http_ver)
 {
+	LOG_DEBUG << "new";
 }
 
 HttpRequest::~HttpRequest()
 {
+	LOG_DEBUG << "del";
 }
 
 void HttpRequest::SetBody(std::string& strBody)
@@ -415,7 +417,7 @@ HttpRequestPtr CurlHttpClient::GetHttpRequest(const std::string& strUrl, HTTP_VE
 	
 	// Éú³Éhttprequest
 	HttpRequestPtr http_request(new HttpRequest(strUrl, http_ver, req_type, bKeepAlive));
-	
+
 	// ±£´æcurl_request
 	http_request->SetContext(curl_request);
 
