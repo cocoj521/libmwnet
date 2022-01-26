@@ -77,8 +77,6 @@ public:
 	//bool isValidFd() { return fd_ > 0; }
 	
 	//int getFd() { return fd_; }
-
-	void setDnsCacheTimeOut(long cache_timeout=60);
 	
 	/**
 	 * [setContext 设置一个上下文，参数类型是boost::any，可以把任何对象放进来]

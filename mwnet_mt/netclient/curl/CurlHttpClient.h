@@ -61,9 +61,6 @@ public:
 	//设置keepalive空闲维持时间和保活探针间隔时间(单位秒)
 	void 	SetKeepAliveTime(int keep_idle=30, int keep_intvl=10);
 
-	//设置dns域名解析缓存超时时间,若不指定具体的时间,默认同一域名60s内只解析一次
-	void 	SetDnsCacheTimeOut(int cache_timeout=60);
-
 	// 设置https校验对端、校验host、证书地址(暂不生效。默认不校验对端，不校验host，无需证书)
 	void 	SetHttpsVerifyPeer();
 	void 	SetHttpsVerifyHost();

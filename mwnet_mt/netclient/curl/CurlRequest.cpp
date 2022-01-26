@@ -124,9 +124,6 @@ void CurlRequest::initCurlRequest(const std::string& url, uint64_t req_uuid, boo
 	curl_easy_setopt(curl_, CURLOPT_MAXREDIRS, 2L);
 
 	curl_easy_setopt(curl_, CURLOPT_NOSIGNAL, 1L);
-
-	//全局dns cache 60s
-	curl_easy_setopt(curl_, CURLOPT_DNS_USE_GLOBAL_CACHE, 60L);
 	
 	curl_easy_setopt(curl_, CURLOPT_URL, url.c_str());
 }
@@ -166,11 +163,6 @@ void CurlRequest::setKeepAliveTime(long keep_idle, long keep_intvl)
 	curl_easy_setopt(curl_, CURLOPT_TCP_KEEPIDLE, keep_idle);
 	// 保活探针间隔时间
 	curl_easy_setopt(curl_, CURLOPT_TCP_KEEPINTVL, keep_intvl);
-}
-
-void CurlRequest::setDnsCacheTimeOut(long cache_timeout)
-{
-	curl_easy_setopt(curl_, CURLOPT_DNS_CACHE_TIMEOUT, cache_timeout);
 }
 
 // 取消请求

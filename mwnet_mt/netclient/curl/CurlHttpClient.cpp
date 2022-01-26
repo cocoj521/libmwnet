@@ -94,14 +94,6 @@ void HttpRequest::SetKeepAliveTime(int keep_idle, int keep_intvl)
 		curl_req->setKeepAliveTime(keep_idle, keep_intvl);
 	}
 }
-void HttpRequest::SetDnsCacheTimeOut(int cache_timeout)
-{
-	CurlRequestPtr curl_req = boost::any_cast<CurlRequestPtr>(any_);
-	if (curl_req)
-	{
-		curl_req->setDnsCacheTimeOut(cache_timeout);
-	}
-}
 
 void HttpRequest::SetContext(const boost::any& context)
 {
@@ -385,12 +377,12 @@ bool CurlHttpClient::InitHttpClient(void* pInvoker,
 		CurlManager::initialize(CurlManager::kCURLssl);
 		
 		// 将curl管理器跑在线程池里
-		latch->resetCount(nIoThrNum);
 		for (int i = 0; i < IoThrNum_; i++)
 		{
+			latch->resetCount(1);
 			pIoThr->run(std::bind(&CurlHttpClient::Start, this));
+			latch->wait();
 		}
-		latch->wait();
 		
 		bRet = true;
 	}
@@ -401,8 +393,17 @@ void CurlHttpClient::Start()
 {
 	std::shared_ptr<CountDownLatch> latch(boost::any_cast<std::shared_ptr<CountDownLatch>>(latch_));
 	std::shared_ptr<CurlManager> curlm(new CurlManager());
-	httpclis_.push_back(curlm);
-	curlm->runCurlEvLoop(latch);
+	boost::any curlm_any = curlm;
+	if (!curlm_any.empty())
+	{
+		httpclis_.push_back(curlm_any);
+		curlm->runCurlEvLoop(latch);
+	}
+	else
+	{
+		latch->countDown();
+		LOG_ERROR << "start one curlm failed";
+	}
 }
 
 //获取HttpRequest

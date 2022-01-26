@@ -70,7 +70,7 @@ int CurlManager::runCurlEvLoop(const std::shared_ptr<CountDownLatch>& latch)
 		int nRet = event_assign(&evInfo_.wakeup_event, evInfo_.evbase, wakeupFd_, EV_READ|EV_PERSIST, &CurlManager::onRecvWakeUpNotify, this);
 		LOG_INFO << "event_assign wakeup event:" << nRet;
 		
-		// 加入事件循环
+		// 将唤醒事件加入循环
 		nRet = event_add(&evInfo_.wakeup_event, NULL);
 		LOG_INFO << "event_add wakeup event:" << nRet;
 
@@ -94,6 +94,10 @@ int CurlManager::runCurlEvLoop(const std::shared_ptr<CountDownLatch>& latch)
 		event_del(&evInfo_.timer_event);
 		//event_del(&evInfo_.request_timeout_event);
 		event_base_free(evInfo_.evbase);
+	}
+	else
+	{
+		LOG_ERROR << "event_base new fail";
 	}
 
 	return 0;
