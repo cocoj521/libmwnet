@@ -80,6 +80,12 @@ public:
 	static std::string& ToSha256HexString(const std::string& bytes, std::string& sha256HexStr, bool upper=false); // 默认小写
 	static std::string& ToSha256HexString(const char* bytes, size_t len, std::string& sha256HexStr, bool upper=false); // 默认小写
 
+	// 生成SHA1
+	static std::string& ToSha1Bytes(const char* bytes, size_t len, std::string& sha1);
+	static std::string& ToSha1Bytes(const std::string& bytes, std::string& sha1);
+	static std::string& ToSha1HexString(const std::string& bytes, std::string& sha1HexStr, bool upper = false); // 默认小写
+	static std::string& ToSha1HexString(const char* bytes, size_t len, std::string& sha1HexStr, bool upper = false); // 默认小写
+
 	// same as std::to_string
 	template<typename T>
 	static std::string  ToString(const T& in)

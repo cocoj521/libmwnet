@@ -5,6 +5,7 @@
 #include <mwnet_mt/crypto/mbedtls/base64.h>
 #include <mwnet_mt/crypto/mbedtls/md5.h>
 #include <mwnet_mt/crypto/mbedtls/sha256.h>
+#include <mwnet_mt/crypto/mbedtls/sha1.h>
 
 #include "MWStringUtil.h"
 
@@ -420,6 +421,15 @@ std::string& StringUtil::ToSha256HexString(const std::string& bytes, std::string
 	return ToSha256HexString(bytes.data(), bytes.size(), sha256HexStr, upper);
 }
 
+std::string& StringUtil::ToSha1Bytes(const std::string& bytes, std::string& sha1)
+{
+	return ToSha1Bytes(bytes.data(), bytes.size(), sha1);
+}
+std::string& StringUtil::ToSha1HexString(const std::string& bytes, std::string& sha1HexStr, bool upper)
+{
+	return ToSha1HexString(bytes.data(), bytes.size(), sha1HexStr, upper);
+}
+
 std::string StringUtil::FormatString(const char *fmt, ...)
 {
 	/*
@@ -676,6 +686,20 @@ std::string& StringUtil::ToSha256HexString(const char* bytes, size_t len, std::s
 	return sha256HexStr;
 }
 
+std::string& StringUtil::ToSha1Bytes(const char* bytes, size_t len, std::string& sha1)
+{
+	sha1.clear();
+	sha1.resize(32);
+	mbedtls_sha1((const uint8_t*)bytes, len, (uint8_t*)sha1.data());
+	return sha1;
+}
+std::string& StringUtil::ToSha1HexString(const char* bytes, size_t len, std::string& sha1HexStr, bool upper)
+{
+	std::string sha1 = "";
+	ToSha256Bytes(bytes, len, sha1);
+	BytesToHexString(sha1.data(), sha1.size(), sha1HexStr, upper);
+	return sha1HexStr;
+}
 #pragma GCC diagnostic warning "-Wconversion"
 #pragma GCC diagnostic error "-Wold-style-cast"
 
