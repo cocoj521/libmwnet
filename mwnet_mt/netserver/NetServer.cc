@@ -2338,10 +2338,10 @@ public:
 		if (bReusePort)
 		{
 			m_pHttpEventLoopThreadPool = new EventLoopThreadPool(m_pHttpLoop, "HttpLoop");
-			//int nLoopNum = threadnum;
-			int nLoopNum = threadnum/2;
+			int nLoopNum = threadnum;
+			//int nLoopNum = threadnum/2;
 			nLoopNum<=0?nLoopNum=1:1;
-			nLoopNum>8?nLoopNum=8:1;
+			nLoopNum>128?nLoopNum=128:1;
 			m_pHttpEventLoopThreadPool->setThreadNum(nLoopNum);
 			m_pHttpEventLoopThreadPool->start();
 
