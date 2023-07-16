@@ -106,7 +106,7 @@ int TcpConnection::send(const void* data, int len, const boost::any& params, int
 int TcpConnection::send(const StringPiece& message, const boost::any& params, int timeout)
 {
 	int ret = SEND_SUCCESS;
-
+	
 	if (loop_->isInLoopThread())
 	{
 		// 连接不可用或超出最大发送缓冲，返回失败
@@ -114,6 +114,8 @@ int TcpConnection::send(const StringPiece& message, const boost::any& params, in
 		sendQueSize_>=m_nMaxSendQue?ret=SEND_HIGHWATERMARK:1;
 		if (SEND_SUCCESS == ret) 
 		{
+			//LOG_INFO << "TcpConnection::send::sendInLoop...conn_uid:" << conn_uuid_;
+			//printf("TcpConnection::send::sendInLoop...conn_uid:%ld\n", conn_uuid_);
 			sendInLoop(message, params, timeout);
 		}
 	}
@@ -124,6 +126,8 @@ int TcpConnection::send(const StringPiece& message, const boost::any& params, in
 		sendQueSize_>=m_nMaxSendQue?ret=SEND_HIGHWATERMARK:1;
 		if (SEND_SUCCESS == ret)
 		{
+			//LOG_INFO << "TcpConnection::send::runInloop::sendInLoop...conn_uid:" << conn_uuid_;
+			//printf("TcpConnection::send::runInloop::sendInLoop...conn_uid:%ld\n", conn_uuid_);
 			void (TcpConnection::*fp)(const StringPiece& message, const boost::any& params, int timeout) = &TcpConnection::sendInLoop;
 			loop_->runInLoop(
 				  			std::bind(fp,
@@ -190,7 +194,7 @@ void TcpConnection::sendInLoop(const void* data, size_t len, const boost::any& p
 			loop_->queueInLoop(std::bind(writeErrCallback_, shared_from_this(), params, SEND_DISCONNECTED));
 		}
 
-		LOG_WARN << "disconnected, give up writing,connuuid:" << conn_uuid_;
+		LOG_WARN << "[NETIO][WR-NOCONN]" << "[" << conn_uuid_ << "]";
 
 		return;
 	}  
@@ -202,13 +206,18 @@ void TcpConnection::sendInLoop(const void* data, size_t len, const boost::any& p
 	// if no thing in output queue, try writing directly
 	if (!channel_->isWriting() && sendQueSize_ <= 0)
 	{
+		//LOG_INFO << "TcpConnection::TcpConnection::sendInLoop::write...conn_uid:" << conn_uuid_;
+		//printf("TcpConnection::TcpConnection::sendInLoop::write...conn_uid:%ld\n", conn_uuid_);
 		nwrote = sockets::write(channel_->fd(), data, len);
 		if (nwrote >= 0)
 		{
 			remaining = len - nwrote;
 			if (remaining == 0 && writeCompleteCallback_)
 			{
+				LOG_TRACE << "[NETIO][WR-DONE]" << "[" << conn_uuid_ << "]:" << "callback,queueInLoop:" << loop_->queueSize();
+				//printf("TcpConnection::TcpConnection::sendInLoop::write over queueInLoop...conn_uid:%ld\n", conn_uuid_);
 				loop_->queueInLoop(std::bind(writeCompleteCallback_, shared_from_this(), params));
+				//LOG_INFO << "TcpConnection::TcpConnection::sendInLoop::write over callback...conn_uid:" << conn_uuid_ << " loop size:" << loop_->queueSize();
 			}
 		}
 		else // nwrote < 0
@@ -216,7 +225,7 @@ void TcpConnection::sendInLoop(const void* data, size_t len, const boost::any& p
 			nwrote = 0;
 			if (errno != EWOULDBLOCK)
 			{
-				LOG_SYSERR << "TcpConnection::sendInLoop error,connuuid:" << conn_uuid_;
+				LOG_SYSERR << "[NETIO][WR-ERROR]" << "[" << conn_uuid_ << "]" << "[" << errno << "]";
 				if (errno == EPIPE || errno == ECONNRESET) // FIXME: any others?
 				{
 					faultError = true;
@@ -227,6 +236,10 @@ void TcpConnection::sendInLoop(const void* data, size_t len, const boost::any& p
 						loop_->queueInLoop(std::bind(writeErrCallback_, shared_from_this(), params, SEND_WRITEERR));
 					}
 				}
+			}
+			else
+			{
+				LOG_WARN << "[NETIO][WR-BLOCK]" << "[" << conn_uuid_ << "]";
 			}
 		}
 	}
@@ -251,6 +264,8 @@ void TcpConnection::sendInLoop(const void* data, size_t len, const boost::any& p
 		// 触发高水位?
 		if (sendQueSize_ >= highWaterMark_ && highWaterMarkCallback_)
 		{
+			//LOG_INFO << "TcpConnection::TcpConnection::sendInLoop::not write over queueInLoop...conn_uid:" << conn_uuid_;
+			//printf("TcpConnection::TcpConnection::sendInLoop::not write over queueInLoop...conn_uid:%ld\n", conn_uuid_);
 			loop_->queueInLoop(std::bind(highWaterMarkCallback_, shared_from_this(), sendQueSize_));
 		}
 
@@ -417,6 +432,11 @@ void TcpConnection::connectEstablished()
 	if (connectionCallback_)
 	{
 		connectionCallback_(shared_from_this());
+		
+		LOG_TRACE << "[NETIO][CONN-ESTAB]"
+			<< "[" << conn_uuid_ << "]"
+			<< "[" << channel_->fd() << "]";
+		
 	}
 }
 
@@ -427,7 +447,11 @@ void TcpConnection::connectDestroyed()
 	{
 		setState(kDisconnected);
 		channel_->disableAll();
-
+		
+		LOG_TRACE << "[NETIO][CONN-CLOSE]"
+			<< "[" << conn_uuid_ << "]"
+			<< "[" << channel_->fd() << "]";
+		
 		// 在连接关闭前将所有未发送的数据回调失败
 		callbackAllNoSendOutputBuffer();
 
@@ -443,7 +467,11 @@ void TcpConnection::connectDestroyedWithLatch(const std::shared_ptr<CountDownLat
 	{
 		setState(kDisconnected);
 		channel_->disableAll();
-
+		
+		LOG_TRACE << "[NETIO][CONN-CLOSE]"
+			<< "[" << conn_uuid_ << "]"
+			<< "[" << channel_->fd() << "]";
+		
 		// 在连接关闭前将所有未发送的数据回调失败
 		callbackAllNoSendOutputBuffer();
 
@@ -583,6 +611,10 @@ void TcpConnection::handleClose()
 	setState(kDisconnected);
 	channel_->disableAll();
 
+	LOG_TRACE << "[NETIO][CONN-CLOSE]"
+		<< "[" << conn_uuid_ << "]" 
+		<< "[" << channel_->fd() << "]";
+
 	// 在连接关闭前将所有未发送的数据回调失败
 	callbackAllNoSendOutputBuffer();
 
@@ -602,6 +634,10 @@ void TcpConnection::handleClose2()
  	setState(kDisconnected);
  	channel_->disableAll();
 
+	LOG_TRACE << "[NETIO][CONN-CLOSE]" 
+		<< "[" << conn_uuid_ << "]" 
+		<< "[" << channel_->fd() << "]";
+
 	// 在连接关闭前将所有未发送的数据回调失败
 	callbackAllNoSendOutputBuffer();
 
@@ -612,7 +648,9 @@ void TcpConnection::handleClose2()
 void TcpConnection::handleError()
 {
 	int err = sockets::getSocketError(channel_->fd());
-	LOG_ERROR << "TcpConnection::handleError [" << conn_uuid_
-	        << "] - SO_ERROR = " << err << " " << strerror_tl(err);
+	LOG_ERROR << "[NETIO][CONN-ERROR]" 
+		<< "[" << conn_uuid_ << "]" 
+		<< "[" << channel_->fd() << "]:"
+		<< "SO_ERROR=" << err << "," << strerror_tl(err);
 }
 

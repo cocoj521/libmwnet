@@ -99,6 +99,14 @@ public:
 	//获取http头中任一个域对应的值(域不区分大小写)
 	//返回值:域对应的值
 	size_t	GetHttpHeaderFieldValue(const char* field, std::string& strValue) const;
+	
+	//获取唯一的http请求ID
+	//返回值:请求ID
+	uint64_t	GetHttpRequestId() const;
+
+	//获取收到完整http请求的时间
+	//返回值:请求时间 
+	uint64_t	GetHttpRequestTime() const;
 
 //..........................附带提供一组解析urlencode的函数......................
 	//解析key,value格式的body,如:cmd=aa&seqid=1&msg=11
@@ -113,7 +121,7 @@ public:
 //.......................................................
 //!!!以下函数上层代码禁止调用!!!
 
-	int		ParseHttpRequest(const char* data, size_t len, size_t maxlen, bool& over);
+	int		ParseHttpRequest(const char* data, size_t len, size_t maxlen, bool& over, const uint64_t& request_id, const int64_t& request_time);
 
 	//重置一些控制标志
 	void	ResetSomeCtrlFlag();
@@ -140,6 +148,8 @@ private:
 	bool m_bHasRsp100Continue;
 	bool m_bIncomplete;
 	std::string m_strRequest;
+	uint64_t m_request_id;
+	int64_t m_request_tm;
 };
 
 class HttpResponse
@@ -181,6 +191,18 @@ public:
 	//使用该函数时SetStatusCode&SetContentType&SetKeepAlive仍可以同时设置，但SetResponseBody一定不能调用
 	void SetHttpResponse(std::string& strResponse);
 
+	//将与该response对应的http请求的requestId设置进来,request_id通过HttpRequest中GetHttpRequestId获取
+	void SetHttpRequestId(const uint64_t& request_id);
+
+	//将与该response对应的http请求的requestTime设置进来,request_time通过HttpRequest中GetHttpRequestTime获取
+	void SetHttpRequestTime(const int64_t& request_time);
+
+	//返回与该response对应的http请求的requestId
+	uint64_t GetHttpRequestId() const;
+
+	//返回与该response对应的http请求的requestTime
+	int64_t GetHttpRequestTime() const;
+
 	//返回格式化好的httpresponse字符串
 	//注意:必须在调用SetResponseBody或SetHttpResponse以后才可以调用
 	const std::string& GetHttpResponse() const;
@@ -202,6 +224,8 @@ private:
 	bool m_bHaveSetLocation;
 	bool m_bHaveSetKeepAlive;
 	bool m_bHaveSetResponseBody;
+	uint64_t m_request_id;
+	int64_t m_request_tm;
 };
 
 //////////////////////////////////////////////////////回调函数//////////////////////////////////////////////////////////////

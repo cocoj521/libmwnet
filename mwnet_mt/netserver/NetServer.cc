@@ -9,6 +9,7 @@
 #include <mwnet_mt/net/InetAddress.h>
 #include <mwnet_mt/net/httpparser/httpparser.h>
 #include <mwnet_mt/base/CountDownLatch.h>
+#include <mwnet_mt/base/Timestamp.h>
 
 #include <mwnet_mt/util/MWStringUtil.h>
 
@@ -276,6 +277,9 @@ typedef std::shared_ptr<net_ctrl_params> net_ctrl_params_ptr;
 struct tInnerParams
 {
 	uint64_t request_id;
+	Timestamp tm_recv;
+	Timestamp tm_send;
+	Timestamp tm_sdok;
 	boost::any params;
 	tInnerParams(uint64_t x, boost::any y)
 	{
@@ -1052,6 +1056,20 @@ size_t	HttpRequest::GetHttpRequestContent(std::string& strHttpRequestContent) co
 	return 0;
 }
 
+//获取唯一的http请求ID
+//返回值:请求ID
+uint64_t HttpRequest::GetHttpRequestId() const
+{
+	return m_request_id;
+}
+
+//获取收到完整http请求的时间
+//返回值:请求时间 
+uint64_t HttpRequest::GetHttpRequestTime() const
+{
+	return m_request_tm;
+}
+
 // ..........................附带提供一组解析urlencode的函数......................
 // 解析key,value格式的body,如:cmd=aa&seqid=1&msg=11
 // 注意:仅当GetContentType返回CONTENT_TYPE_URLENCODE才可以使用该函数去解析
@@ -1131,9 +1149,12 @@ bool HttpRequest::b100ContinueInHeader()
 // 返回值 0:成功 此时要看over是否为true,若为true代表解析完成,若为false代表包未收全
 // 返回值 1:代表解析失败 需关闭连接
 // 返回值 2:代表包过大,需关闭连接
-int	HttpRequest::ParseHttpRequest(const char* data, size_t len, size_t maxlen, bool& over)
+int	HttpRequest::ParseHttpRequest(const char* data, size_t len, size_t maxlen, bool& over, const uint64_t& request_id, const int64_t& request_time)
 {
 	int nRet = 1;
+
+	m_request_id = request_id;
+	m_request_tm = request_time;
 
 	HttpParser* parser = reinterpret_cast<HttpParser* >(p);
 	if (parser)
@@ -1415,6 +1436,27 @@ void HttpResponse::SetHttpResponse(std::string& strResponse)
 	m_strResponse.swap(strResponse);
 }
 
+//将与该response对应的http请求的requestId设置进来,request_id通过HttpRequest中GetHttpRequestId获取
+void HttpResponse::SetHttpRequestId(const uint64_t& request_id)
+{
+	m_request_id = request_id;
+}
+
+//将与该response对应的http请求的requestTime设置进来,request_time通过HttpRequest中GetHttpRequestTime获取
+void HttpResponse::SetHttpRequestTime(const int64_t& request_time)
+{
+	m_request_tm = request_time;
+}
+
+uint64_t HttpResponse::GetHttpRequestId() const
+{
+	return m_request_id;
+}
+
+int64_t HttpResponse::GetHttpRequestTime() const
+{
+	return m_request_tm;
+}
 // 返回格式化好的httpresponse字符串-注意:必须在SetResponseBody设置OK了以后才可以调用
 const std::string& HttpResponse::GetHttpResponse() const
 {
@@ -1475,9 +1517,9 @@ public:
   	// 回应
 	int OnSendMsg(const TcpConnectionPtr& conn, const boost::any& params, const HttpResponse& rsp, int timeout)
 	{
-		uint64_t request_id = MakeSnowId(m_ptrCtrlParams->g_unique_node_id, m_ptrCtrlParams->g_nSequnceId);
+		const uint64_t& request_id = rsp.GetHttpRequestId();
+		const int64_t& request_time = rsp.GetHttpRequestTime();
 		tInnerParams inner_params(request_id, params);
-		boost::any inner_any(inner_params);
 
 		if (m_ptrCtrlParams->g_bEnableSendLog_http)
 		{
@@ -1487,6 +1529,12 @@ public:
 				<< "[" << conn->peerAddress().toIpPort() << "]"
 				<< ":" << rsp.GetHttpResponse();
 		}
+		
+		//记录发送时间
+		inner_params.tm_send = Timestamp::now();
+		//保存收到完整请求的时间
+		inner_params.tm_recv = Timestamp(request_time);
+		boost::any inner_any(inner_params);
 
 		if (!rsp.IsKeepAlive()) conn->setNeedCloseFlag();
 		int nSendRet = conn->send(rsp.GetHttpResponse(), inner_any, timeout);
@@ -1666,7 +1714,7 @@ private:
 		}
 	}
 
-	void DealHttpRequest(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time)
+	void DealHttpRequest(const TcpConnectionPtr& conn, Buffer* buf, Timestamp time, const uint64_t& request_id)
 	{
 		if (conn && !conn->getExInfo().empty())
 		{
@@ -1675,13 +1723,22 @@ private:
 			StringPiece strRecvMsg = buf->toStringPiece();
 			bool bParseOver = false;
 			// 执行解析
-			int nParseRet = reqptr->ParseHttpRequest(strRecvMsg.data(), strRecvMsg.size(), m_ptrCtrlParams->g_nMaxRecvBuf_Http, bParseOver);
+			int nParseRet = reqptr->ParseHttpRequest(strRecvMsg.data(), strRecvMsg.size(), 
+								m_ptrCtrlParams->g_nMaxRecvBuf_Http, bParseOver, request_id, time.microSecondsSinceEpoch());
 			// 解析析成功
 			if (0 == nParseRet)
 			{
 				// 包已收完，并解析完，回调给上层
 				if (bParseOver)
 				{
+					// write logs
+					if (m_ptrCtrlParams->g_bEnableRecvLog_http)
+					{
+						LOG_INFO << "[HTTP][RECVOK ]"
+							<< "[" << request_id << "]"
+							<< "[" << conn->getConnuuid() << "]";
+					}
+
 					int nReqType = reqptr->GetRequestType();				
 					if (m_pfunc_on_readmsg_http && (nReqType == HTTP_REQUEST_POST || nReqType == HTTP_REQUEST_GET)) //discard unknown request
 					{
@@ -1719,7 +1776,6 @@ private:
 					if (!reqptr->HasRsp100Continue() && reqptr->b100ContinueInHeader())
 					{
 						boost::any params;
-						uint64_t request_id = MakeSnowId(m_ptrCtrlParams->g_unique_node_id, m_ptrCtrlParams->g_nSequnceId);
 						tInnerParams inner_params(request_id, params);
 						boost::any inner_any(inner_params);
 
@@ -1768,6 +1824,7 @@ private:
 				}
 
 				LOG_WARN << "[HTTP][RECVERR]"
+					<< "[" << request_id << "]"
 					<< "[" << conn->getConnuuid() << "]"
 					<< ":" << strErrMsg;
 
@@ -1784,7 +1841,6 @@ private:
 				conn->setNeedCloseFlag();
 
 				boost::any params;
-				uint64_t request_id = MakeSnowId(m_ptrCtrlParams->g_unique_node_id, m_ptrCtrlParams->g_nSequnceId);
 				tInnerParams inner_params(request_id, params);
 				boost::any inner_any(inner_params);
 
@@ -1816,23 +1872,27 @@ private:
 	{
 		if (!conn) return;
 
+		//http也存在残包情况,所以这里的ID不完全表示惟一的一次http请求
+		uint64_t request_id = MakeSnowId(m_ptrCtrlParams->g_unique_node_id, m_ptrCtrlParams->g_nSequnceId);
+
 		// write logs
 		if (m_ptrCtrlParams->g_bEnableRecvLog_http)
 		{
-			uint64_t request_id = MakeSnowId(m_ptrCtrlParams->g_unique_node_id, m_ptrCtrlParams->g_nSequnceId);
 			const char* pRecv = buf->reverse_peek(len);
-			LOG_INFO << "[HTTP][RECVOK ]"
+			StringPiece strRecv(pRecv, static_cast<int>(len));
+			LOG_INFO << "[HTTP][RECVING]"
 				<< "[" << request_id << "]"
 				<< "[" << conn->getConnuuid() << "]"
 				<< "[" << conn->peerAddress().toIpPort() << "]"
-				<< ":" << (pRecv ? pRecv : "RECV NULL");
+				<< "[" << len << "]"
+				<< ":" << (pRecv ? strRecv : "RECV NULL");
 		}
 
 		m_ptrCtrlParams->g_nTotalReqNum_Http.increment();
 
 		UpdateConnList(conn, false);
 
-		DealHttpRequest(conn, buf, time);
+		DealHttpRequest(conn, buf, time, request_id);
 	}
 
 	void onWriteOk(const TcpConnectionPtr& conn, const boost::any& params)
@@ -1840,13 +1900,18 @@ private:
 		if (!conn) return;
 
 		tInnerParams inner_params(boost::any_cast<tInnerParams>(params));
+		inner_params.tm_sdok = Timestamp::now();
+		uint64_t tm_snd = inner_params.tm_sdok.microSecondsSinceEpoch() - inner_params.tm_send.microSecondsSinceEpoch();
+		uint64_t tm_req = inner_params.tm_sdok.microSecondsSinceEpoch() - inner_params.tm_recv.microSecondsSinceEpoch();
 
 		if (m_ptrCtrlParams->g_bEnableRecvLog_http)
 		{
 			LOG_INFO << "[HTTP][SENDOK ]"
 				<< "[" << inner_params.request_id << "]"
 				<< "[" << conn->getConnuuid() << "]"
-				<< "[" << conn->peerAddress().toIpPort() << "]";
+				<< "[" << conn->peerAddress().toIpPort() << "]"
+				<< "[REQTM:" << tm_req << "]"
+				<< "[SNDTM:" << tm_snd << "]";
 		}
 
 		// 减少总待发出计数
@@ -2322,8 +2387,7 @@ public:
 		size_t nDefRecvBuf, size_t nMaxRecvBuf, size_t nMaxSendQue)
 	{
 		LOG_INFO << "HttpServer Start";
-
-		
+				
 		threadnum<=0?threadnum=0:1;
 		threadnum>128?threadnum=128:1;
 
@@ -2338,10 +2402,12 @@ public:
 		if (bReusePort)
 		{
 			m_pHttpEventLoopThreadPool = new EventLoopThreadPool(m_pHttpLoop, "HttpLoop");
-			int nLoopNum = threadnum;
 			//int nLoopNum = threadnum/2;
-			nLoopNum<=0?nLoopNum=1:1;
+			int nLoopNum = threadnum;
+			nLoopNum<=1?nLoopNum=1:1;
 			nLoopNum>128?nLoopNum=128:1;
+			int nEverySvrIoThrNum = threadnum / 2;
+			nEverySvrIoThrNum < 2 ? nEverySvrIoThrNum = 2 : 1;
 			m_pHttpEventLoopThreadPool->setThreadNum(nLoopNum);
 			m_pHttpEventLoopThreadPool->start();
 
