@@ -290,10 +290,11 @@ class NetServer
 		~NetServer();
 	public:
 		// 开启或关闭接收/发送日志,默认日志全部是自动开启的,若要一启动就自动关闭日志,需要在startserver调用以下函数关闭
-		void 	EnableHttpServerRecvLog(bool bEnable=true);
-		void 	EnableHttpServerSendLog(bool bEnable=true);
-		void 	EnableTcpServerRecvLog(bool bEnable=true);
-		void 	EnableTcpServerSendLog(bool bEnable=true);
+		//bEnableBody 用来控制是否输出通讯详细报文
+		void 	EnableHttpServerRecvLog(bool bEnable = true, bool bEnableBody = true);
+		void 	EnableHttpServerSendLog(bool bEnable = true, bool bEnableBody = true);
+		void 	EnableTcpServerRecvLog(bool bEnable = true, bool bEnableBody = true);
+		void 	EnableTcpServerSendLog(bool bEnable = true, bool bEnableBody = true);
 	public:
 		//启动TCP服务
 		void 	StartTcpServer(void* pInvoker,		/*上层调用的类指针*/

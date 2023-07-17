@@ -259,6 +259,10 @@ typedef struct _net_ctrl_params
 	bool g_bEnableSendLog_http;					//发送日志开关_http
 	bool g_bEnableRecvLog_tcp;					//接收日志开关_tcp
 	bool g_bEnableSendLog_tcp;					//发送日志开关_tcp
+	bool g_bEnableRecvLog_http_body;			//接收日志body开关_http
+	bool g_bEnableSendLog_http_body;			//发送日志body开关_http
+	bool g_bEnableRecvLog_tcp_body;				//接收日志body开关_tcp
+	bool g_bEnableSendLog_tcp_body;				//发送日志body开关_tcp
 
 	size_t g_nMaxRecvBuf_Tcp;					//tcp最大接收缓冲
 	size_t g_nMaxRecvBuf_Http;					//http最大接收缓冲
@@ -377,23 +381,23 @@ public:
 		tInnerParams inner_params(request_id, params);
 		boost::any inner_any(inner_params);
 
-		if (m_ptrCtrlParams->g_bEnableRecvLog_tcp)
+		if (m_ptrCtrlParams->g_bEnableSendLog_tcp)
 		{
 			LOG_INFO << "[TCP][SENDING]"
 				<< "[" << request_id << "]"
 				<< "[" << conn->getConnuuid() << "]"
 				<< "[" << conn->peerAddress().toIpPort() << "]"
-				<< ":" << StringUtil::BytesToHexString(szMsg, nMsgLen);
+				<< ":" 
+				<< (m_ptrCtrlParams->g_bEnableSendLog_tcp_body?StringUtil::BytesToHexString(szMsg, nMsgLen):"LOG-DISABLE");
 		}
 
 		if (!bKeepAlive) conn->setNeedCloseFlag();
 		int nSendRet = conn->send(szMsg, static_cast<int>(nMsgLen), inner_any, timeout);
 
-		if (m_ptrCtrlParams->g_bEnableRecvLog_tcp && 0 != nSendRet)
+		if (0 != nSendRet)
 		{
 			LOG_WARN << "[TCP][SENDERR]"
 				<< "[" << request_id << "]"
-				<< "[" << conn->getConnuuid() << "]"
 				<< "[" << conn->peerAddress().toIpPort() << "]"
 				<< ":" << "SEND ERROR,ERCODE:" << nSendRet;
 		}
@@ -579,7 +583,8 @@ private:
 				<< "[" << request_id << "]"
 				<< "[" << conn->getConnuuid() << "]"
 				<< "[" << conn->peerAddress().toIpPort() << "]"
-				<< ":" << (pRecv ? StringUtil::BytesToHexString(pRecv, len) : "RECV NULL");
+				<< ":" 
+				<< (m_ptrCtrlParams->g_bEnableRecvLog_tcp_body?(pRecv ? StringUtil::BytesToHexString(pRecv, len) : "RECV NULL"):"LOG-DISABLE");
 		}
 
 		m_ptrCtrlParams->g_nTotalReqNum_Tcp.increment();
@@ -637,7 +642,7 @@ private:
 
 		tInnerParams inner_params(boost::any_cast<tInnerParams>(params));
 
-		if (m_ptrCtrlParams->g_bEnableRecvLog_tcp)
+		if (m_ptrCtrlParams->g_bEnableSendLog_tcp)
 		{
 			LOG_INFO << "[TCP][SENDOK ]"
 				<< "[" << inner_params.request_id << "]"
@@ -669,14 +674,11 @@ private:
 
 		tInnerParams inner_params(boost::any_cast<tInnerParams>(params));
 		
-		if (m_ptrCtrlParams->g_bEnableRecvLog_tcp)
-		{
-			LOG_ERROR << "[TCP][SENDERR]"
-				<< "[" << inner_params.request_id << "]"
-				<< "[" << conn->getConnuuid() << "]"
-				<< "[" << conn->peerAddress().toIpPort() << "]"
-				<< ":" << "SEND ERROR,ERCODE:" << errCode;
-		}
+		LOG_ERROR << "[TCP][SENDERR]"
+			<< "[" << inner_params.request_id << "]"
+			<< "[" << conn->getConnuuid() << "]"
+			<< "[" << conn->peerAddress().toIpPort() << "]"
+			<< ":" << "SEND ERROR,ERCODE:" << errCode;
 
 		// 减少总待发出计数
 		m_ptrCtrlParams->g_nTotalWaitSendNum_tcp.decrement();
@@ -1527,7 +1529,8 @@ public:
 				<< "[" << request_id << "]"
 				<< "[" << conn->getConnuuid() << "]"
 				<< "[" << conn->peerAddress().toIpPort() << "]"
-				<< ":" << rsp.GetHttpResponse();
+				<< ":" 
+				<< (m_ptrCtrlParams->g_bEnableSendLog_http_body?rsp.GetHttpResponse():"LOG-DISABLE");
 		}
 		
 		//记录发送时间
@@ -1539,7 +1542,7 @@ public:
 		if (!rsp.IsKeepAlive()) conn->setNeedCloseFlag();
 		int nSendRet = conn->send(rsp.GetHttpResponse(), inner_any, timeout);
 
-		if (m_ptrCtrlParams->g_bEnableSendLog_http && 0 != nSendRet)
+		if (0 != nSendRet)
 		{
 			LOG_WARN << "[HTTP][SENDERR]"
 				<< "[" << request_id << "]"
@@ -1793,7 +1796,7 @@ private:
 						// 回应100-continue
 						int nSendRet = conn->send("100-continue", inner_any);
 
-						if (m_ptrCtrlParams->g_bEnableSendLog_http && 0 != nSendRet)
+						if (0 != nSendRet)
 						{
 							LOG_WARN << "[HTTP][SENDERR]"
 								<< "[" << request_id << "]"
@@ -1844,19 +1847,16 @@ private:
 				tInnerParams inner_params(request_id, params);
 				boost::any inner_any(inner_params);
 
-				if (m_ptrCtrlParams->g_bEnableSendLog_http)
-				{
-					LOG_WARN << "[HTTP][SENDING]"
-						<< "[" << request_id << "]"
-						<< "[" << conn->getConnuuid() << "]"
-						<< "[" << conn->peerAddress().toIpPort() << "]"
-						<< ":" << strBadRequest << strErrMsg;
-				}
+				LOG_WARN << "[HTTP][SENDING]"
+					<< "[" << request_id << "]"
+					<< "[" << conn->getConnuuid() << "]"
+					<< "[" << conn->peerAddress().toIpPort() << "]"
+					<< ":" << strBadRequest << strErrMsg;
 
 				// 解析失败，直接生成失败的response,回:400
 				int nSendRet = conn->send(strBadRequest + strErrMsg, inner_any);
 
-				if (m_ptrCtrlParams->g_bEnableSendLog_http && 0 != nSendRet)
+				if (0 != nSendRet)
 				{
 					LOG_WARN << "[HTTP][SENDERR]"
 						<< "[" << request_id << "]"
@@ -1885,7 +1885,8 @@ private:
 				<< "[" << conn->getConnuuid() << "]"
 				<< "[" << conn->peerAddress().toIpPort() << "]"
 				<< "[" << len << "]"
-				<< ":" << (pRecv ? strRecv : "RECV NULL");
+				<< ":" 
+				<< (m_ptrCtrlParams->g_bEnableRecvLog_http_body?(pRecv ? strRecv : "RECV NULL") :"LOG-DISABLE");
 		}
 
 		m_ptrCtrlParams->g_nTotalReqNum_Http.increment();
@@ -1903,8 +1904,8 @@ private:
 		inner_params.tm_sdok = Timestamp::now();
 		uint64_t tm_snd = inner_params.tm_sdok.microSecondsSinceEpoch() - inner_params.tm_send.microSecondsSinceEpoch();
 		uint64_t tm_req = inner_params.tm_sdok.microSecondsSinceEpoch() - inner_params.tm_recv.microSecondsSinceEpoch();
-
-		if (m_ptrCtrlParams->g_bEnableRecvLog_http)
+		
+		if (m_ptrCtrlParams->g_bEnableSendLog_http)
 		{
 			LOG_INFO << "[HTTP][SENDOK ]"
 				<< "[" << inner_params.request_id << "]"
@@ -1938,14 +1939,11 @@ private:
 
 		tInnerParams inner_params(boost::any_cast<tInnerParams>(params));
 
-		if (m_ptrCtrlParams->g_bEnableRecvLog_http)
-		{
-			LOG_ERROR << "[HTTP][SENDERR]"
-				<< "[" << inner_params.request_id << "]"
-				<< "[" << conn->getConnuuid() << "]"
-				<< "[" << conn->peerAddress().toIpPort() << "]"
-				<< ":" << "SEND ERROR,ERCODE:" << errCode;
-		}
+		LOG_ERROR << "[HTTP][SENDERR]"
+			<< "[" << inner_params.request_id << "]"
+			<< "[" << conn->getConnuuid() << "]"
+			<< "[" << conn->peerAddress().toIpPort() << "]"
+			<< ":" << "SEND ERROR,ERCODE:" << errCode;
 
 		// 减少总待发出计数
 		m_ptrCtrlParams->g_nTotalWaitSendNum_http.decrement();
@@ -2698,6 +2696,10 @@ m_NetServerCtrl(new NetServerCtrlInfo())
 	ptrParams->g_bEnableSendLog_http = true;
 	ptrParams->g_bEnableRecvLog_tcp = true;
 	ptrParams->g_bEnableSendLog_tcp = true;
+	ptrParams->g_bEnableRecvLog_http_body = true;
+	ptrParams->g_bEnableSendLog_http_body = true;
+	ptrParams->g_bEnableRecvLog_tcp_body = true;
+	ptrParams->g_bEnableSendLog_tcp_body = true;
 }
 
 //设置nodeid(1~8000间取值)
@@ -2723,6 +2725,10 @@ m_NetServerCtrl(new NetServerCtrlInfo())
 	ptrParams->g_bEnableSendLog_http = true;
 	ptrParams->g_bEnableRecvLog_tcp = true;
 	ptrParams->g_bEnableSendLog_tcp = true;
+	ptrParams->g_bEnableRecvLog_http_body = true;
+	ptrParams->g_bEnableSendLog_http_body = true;
+	ptrParams->g_bEnableRecvLog_tcp_body = true;
+	ptrParams->g_bEnableSendLog_tcp_body = true;
 }
 
 NetServer::~NetServer()
@@ -2732,39 +2738,55 @@ NetServer::~NetServer()
 }
 
 // 开启或关闭接收/发送日志
-void NetServer::EnableHttpServerRecvLog(bool bEnable)
+void NetServer::EnableHttpServerRecvLog(bool bEnable, bool bEnableBody)
 {
 	if (m_NetServerCtrl)
 	{
 		net_ctrl_params_ptr pCtrlParams = m_NetServerCtrl->m_ptrCtrlParams;
-		if (pCtrlParams) pCtrlParams->g_bEnableRecvLog_http = bEnable;
+		if (pCtrlParams)
+		{
+			pCtrlParams->g_bEnableRecvLog_http = bEnable;
+			pCtrlParams->g_bEnableRecvLog_http_body = bEnableBody;
+		}
 	}
 }
 
-void NetServer::EnableHttpServerSendLog(bool bEnable)
+void NetServer::EnableHttpServerSendLog(bool bEnable, bool bEnableBody)
 {
 	if (m_NetServerCtrl)
 	{
 		net_ctrl_params_ptr pCtrlParams = m_NetServerCtrl->m_ptrCtrlParams;
-		if (pCtrlParams) pCtrlParams->g_bEnableSendLog_http = bEnable;
+		if (pCtrlParams)
+		{
+			pCtrlParams->g_bEnableSendLog_http = bEnable;
+			pCtrlParams->g_bEnableSendLog_http_body = bEnableBody;
+		}
 	}
 }
 
-void NetServer::EnableTcpServerRecvLog(bool bEnable)
+void NetServer::EnableTcpServerRecvLog(bool bEnable, bool bEnableBody)
 {
 	if (m_NetServerCtrl)
 	{
 		net_ctrl_params_ptr pCtrlParams = m_NetServerCtrl->m_ptrCtrlParams;
-		if (pCtrlParams) pCtrlParams->g_bEnableRecvLog_tcp = bEnable;
+		if (pCtrlParams)
+		{
+			pCtrlParams->g_bEnableRecvLog_tcp = bEnable;
+			pCtrlParams->g_bEnableRecvLog_tcp_body = bEnableBody;
+		}
 	}
 }
 
-void NetServer::EnableTcpServerSendLog(bool bEnable)
+void NetServer::EnableTcpServerSendLog(bool bEnable, bool bEnableBody)
 {
 	if (m_NetServerCtrl)
 	{
 		net_ctrl_params_ptr pCtrlParams = m_NetServerCtrl->m_ptrCtrlParams;
-		if (pCtrlParams) pCtrlParams->g_bEnableSendLog_tcp = bEnable;
+		if (pCtrlParams)
+		{
+			pCtrlParams->g_bEnableSendLog_tcp = bEnable;
+			pCtrlParams->g_bEnableSendLog_tcp_body = bEnableBody;
+		}
 	}
 }
 

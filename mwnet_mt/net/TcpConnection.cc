@@ -495,7 +495,10 @@ void TcpConnection::handleRead(Timestamp receiveTime)
 	}
 	else if (n == 0)
 	{
-		LOG_WARN << "TcpConnection::handleRead readFd=" << n << ",close it,connuid:" << conn_uuid_;
+		LOG_TRACE << "[NETIO][RD-ZERO]"
+			<< "[" << conn_uuid_ << "]"
+			<< "[" << channel_->fd() << "]";
+
 		handleClose();
 	}
 	else
