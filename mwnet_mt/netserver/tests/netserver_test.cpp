@@ -1,6 +1,10 @@
 #include "../NetServer.h"
 #include <mwnet_mt/util/MWEventLoop.h>
 #include <mwnet_mt/util/MWThreadPool.h>
+#include <mwnet_mt/util/MWTimestamp.h>
+#include <mwnet_mt/base/LogFile.h>
+#include <mwnet_mt/base/Logging.h>
+#include <mwnet_mt/base/Logging.h>
 
 #include <stdint.h>
 #include <pthread.h>
@@ -31,10 +35,12 @@
 using namespace MWNET_MT::SERVER;
 using namespace MWEVENTLOOP;
 using namespace MWTHREADPOOL;
+using namespace MWTIMESTAMP;
 
 
 MWNET_MT::SERVER::NetServer* m_pNetServer1 = NULL;
 MWNET_MT::SERVER::NetServer* m_pNetServer2 = NULL;
+bool g_bUseWorkThrPool = false;
 
 std::shared_ptr<MWTHREADPOOL::ThreadPool> m_pThreadPool;
 
@@ -47,6 +53,10 @@ struct NETSERVER_CONFIG
 	int idleconntime;						/*空连接踢空时间*/
 	int maxconnnum; 						/*最大连接数*/
 	bool bReusePort;						/*是否启用SO_REUSEPORT*/
+	bool bEnableRecvLog;
+	bool bEnableSendLog;
+	bool bEnableRecvLog_body;
+	bool bEnableSendLog_body;
 	pfunc_on_connection pOnConnection; 		/*与连接相关的事件回调(connect/close/error etc.)*/
 	pfunc_on_readmsg_tcp pOnReadMsg_tcp;	/*网络层收到数据的事件回调-用于tcpserver*/
 	pfunc_on_readmsg_http pOnReadMsg_http;	/*网络层收到数据的事件回调-用于httpserver*/
@@ -72,6 +82,10 @@ struct NETSERVER_CONFIG
 		nDefRecvBuf		= 4  * 1024;
 		nMaxRecvBuf		= 32 * 1024;
 		nMaxSendQue		= 64;
+		bEnableRecvLog = true;
+		bEnableSendLog = true;
+		bEnableRecvLog_body = true;
+		bEnableSendLog_body = true;
 	}
 };
 
@@ -303,6 +317,7 @@ int func_on_connection_http(void* pInvoker, uint64_t conn_uuid, const boost::any
 {
 	if (bConnected)
 	{
+		//LOG_INFO << "func_on_connection_http...conn_uid:" << conn_uuid;
 		//printf("httpserver---%d-new link %ld-%s\n", m_pNetServer->GetCurrHttpConnNum(),sockid,szIpPort);
 	}
 	else
@@ -710,28 +725,27 @@ int deal_wbs_mms(void* pInvoker, uint64_t conn_uuid, const boost::any& conn, con
 	return 0;
 }
 
-//从网络层读取到信息的回调
-//返回值0:代表成功 >0代表其他各种错误或反控等信息(待定) <0:底层会主动强制关闭连接
-//expect:100-continue底层会自动处理并自动回复，不会再往上层回调，上层不需要处理
-int func_on_readmsg_http(void* pInvoker, uint64_t conn_uuid, const boost::any& conn, const boost::any& sessioninfo, const HttpRequest* pHttpReq)
+struct tSession 
 {
-	if (1 == g_nRunWbsV4Jd) 
-	{
-		return deal_wbs_v4_jd(pInvoker, conn_uuid, conn, pHttpReq);
-	}
-	else if (2 == g_nRunWbsV4Jd)
-	{
-		return deal_wbs_mms(pInvoker, conn_uuid, conn, pHttpReq);
-	}
-	std::string strUrl = "";std::string strBody = "";
+	MWTIMESTAMP::Timestamp tOnRead;
+	uint64_t request_id;
+};
+
+void send_http_rsp(void* pInvoker, uint64_t conn_uuid, const boost::any& conn, const boost::any& sessioninfo, const HttpRequest* pHttpReq)
+{
+	tSession sn;
+	sn.tOnRead = MWTIMESTAMP::Timestamp::Now();
+	sn.request_id = pHttpReq->GetHttpRequestId();
+	boost::any session(sn);
+	m_pNetServer2->SetHttpSessionInfo(conn_uuid, conn, session);
+
+	std::string strUrl = ""; std::string strBody = "";
 	pHttpReq->GetUrl(strUrl);
-	//printf("func_on_readmsg_http:%s\n", strUrl.c_str());
 	bool bKeepAlive = pHttpReq->IsKeepAlive();
-	//printf("keepalive:%d\n", bKeepAlive);
-	//pHttpReq->GetBodyData(strBody);
-	//printf("bodydata:%s\n", strBody.c_str());
-	
+
 	HttpResponse rsp;
+	rsp.SetHttpRequestId(pHttpReq->GetHttpRequestId());
+	rsp.SetHttpRequestTime(pHttpReq->GetHttpRequestTime());
 	//这里根据url的不同进行不同的处理，并生成不同的回应(geturl函数的返回值是区分大小的，若不想区分，自行处理)
 	//可以添加到对应的线程处理队列中去处理,尽量不要在这里处理，以免阻塞底层处理
 	//添加到线程中异步处理前，必须把httprequest中的信息提前保存，不可以直接保存它，因为它在回调函数结束后，会自动析构
@@ -759,21 +773,39 @@ int func_on_readmsg_http(void* pInvoker, uint64_t conn_uuid, const boost::any& c
 	}
 	else
 	{
-		printf("######****************bad request:%s\n", strUrl.c_str());
-		rsp.SetStatusCode(400);
-		//rsp.SetResponseBody("自定义。。。");
+		rsp.SetKeepAlive(bKeepAlive);
+		rsp.SetStatusCode(200);
+		rsp.SetContentType("application/x-www-form-urlencoded; charset=utf-8");
+		std::string strBody;
+		pHttpReq->GetHttpRequestContent(strBody);
+		rsp.SetResponseBody(strBody);
 	}
 
 	boost::any params;
 	m_pNetServer2->SendHttpResponse(conn_uuid, conn, params, rsp);
+}
+
+//从网络层读取到信息的回调
+//返回值0:代表成功 >0代表其他各种错误或反控等信息(待定) <0:底层会主动强制关闭连接
+//expect:100-continue底层会自动处理并自动回复，不会再往上层回调，上层不需要处理
+int func_on_readmsg_http(void* pInvoker, uint64_t conn_uuid, const boost::any& conn, const boost::any& sessioninfo, const HttpRequest* pHttpReq)
+{
+	if (g_bUseWorkThrPool)
+	{
+		m_pThreadPool->RunTask(std::bind(send_http_rsp, pInvoker, conn_uuid, conn, sessioninfo, pHttpReq));
+	}
+	else
+	{
+		send_http_rsp(pInvoker, conn_uuid, conn, sessioninfo, pHttpReq);
+	}
 
 	return 0;
 }
+
 //发送数据完成的回调
 //返回值0:代表成功 >0代表其他各种错误或反控等信息(待定) <0:底层会主动强制关闭连接
 int func_on_sendok_tcp(void* pInvoker, const uint64_t conn_uuid, const boost::any& conn, const boost::any& sessioninfo, const boost::any& params)
 {
-	//printf("pfunc_on_sendok_tcp...%ld\n", conn_uuid);
 	return 0;
 }
 int func_on_senderr_tcp(void* pInvoker, const uint64_t conn_uuid, const boost::any& conn, const boost::any& sessioninfo, const boost::any& params, int errCode)
@@ -785,6 +817,26 @@ int func_on_senderr_tcp(void* pInvoker, const uint64_t conn_uuid, const boost::a
 //返回值0:代表成功 >0代表其他各种错误或反控等信息(待定) <0:底层会主动强制关闭连接
 int func_on_sendok_http(void* pInvoker, const uint64_t conn_uuid, const boost::any& conn, const boost::any& sessioninfo, const boost::any& params)
 {
+	static uint64_t max_tm_reqid = 0;
+	static int64_t max_tm = 0;
+	MWTIMESTAMP::Timestamp tOnSendOk = MWTIMESTAMP::Timestamp::Now();
+	tSession sn = boost::any_cast<tSession>(sessioninfo);
+	int64_t tDiff = tOnSendOk.MicroSecondsSinceEpoch() - sn.tOnRead.MicroSecondsSinceEpoch();
+	if (tDiff > 20*1000)
+	{
+		//保存最大耗时
+		if (tDiff > max_tm)
+		{
+			max_tm = tDiff;
+			max_tm_reqid = sn.request_id;
+		}
+		LOG_INFO << "pfunc_on_sendok_http...conn_uid:" << conn_uuid 
+			<< " request_id:" << sn.request_id 
+			<< " req_tm:" << tDiff
+			<< " max_tm:" << max_tm
+			<< " max_tm_reqid:" << max_tm_reqid;
+		//printf("pfunc_on_sendok_http...conn_uid:%ld,tOnnConn:%ld,tOnSendOk:%ld,diff:%ld\n", conn_uuid, tOnRead.MicroSecondsSinceEpoch(), tOnSendOk.MicroSecondsSinceEpoch(), tDiff);
+	}
 	//printf("pfunc_on_sendok_http...%ld\n", conn_uuid);
 	return 0;
 }
@@ -852,8 +904,9 @@ void* StartHttpServer(void* p)
 	NETSERVER_CONFIG* pConfig = reinterpret_cast<NETSERVER_CONFIG*>(p);
 	if (pConfig)
 	{
-		m_pNetServer2->EnableHttpServerRecvLog();
-		m_pNetServer2->EnableHttpServerSendLog();
+		printf("----%d-%d-%d-%d-----\n", pConfig->bEnableRecvLog, pConfig->bEnableRecvLog_body, pConfig->bEnableSendLog, pConfig->bEnableSendLog_body);
+		m_pNetServer2->EnableHttpServerRecvLog(pConfig->bEnableRecvLog, pConfig->bEnableRecvLog_body);
+		m_pNetServer2->EnableHttpServerSendLog(pConfig->bEnableSendLog, pConfig->bEnableSendLog_body);
 		printf("httpserver:%u start success...\n",pConfig->listenport);
 		m_pNetServer2->StartHttpServer(pConfig->pInvoker, pConfig->listenport, 
 			pConfig->threadnum, pConfig->idleconntime, 
@@ -1049,8 +1102,7 @@ int main(int argc, char* argv[])
 		m_pThreadPool->SetMaxTaskQueueSize(nTaskQue);
 
 		m_pThreadPool->StartThreadPool(nPoolSize);
-
-		
+				
 		//tcp回调函数
 		pTcpConfig->pOnConnection	= func_on_connection_tcp;
 		pTcpConfig->pOnReadMsg_tcp	= func_on_readmsg_tcp;
@@ -1083,27 +1135,52 @@ int main(int argc, char* argv[])
 		scanf("%hu", &pHttpConfig->listenport);
 		printf("httpserver port:%u\n", pHttpConfig->listenport);
 
-		printf("select wbs model: 0-skip 1-wbsv4 2-mmssvr\n");
-		scanf("%d", &g_nRunWbsV4Jd);
+		int nTmp = 0;
+		printf("bReusePort:\n");
+		scanf("%d", &nTmp);
+		pHttpConfig->bReusePort = nTmp;
+		printf("bReusePort:%d\n", pHttpConfig->bReusePort);
 
-		if (g_nRunWbsV4Jd)
+		printf("bEnableSendLog:\n");
+		scanf("%d", &nTmp);
+		pHttpConfig->bEnableSendLog = nTmp;
+		printf("bEnableSendLog:%d\n", pHttpConfig->bEnableSendLog);
+		
+		printf("bEnableRecvLog:\n");
+		scanf("%d", &nTmp);
+		pHttpConfig->bEnableRecvLog = nTmp;
+		printf("bEnableRecvLog:%d\n", pHttpConfig->bEnableRecvLog);
+
+		printf("bEnableSendLog_body:\n");
+		scanf("%d", &nTmp);
+		pHttpConfig->bEnableSendLog_body = nTmp;
+		printf("bEnableSendLog_body:%d\n", pHttpConfig->bEnableSendLog_body);
+
+		printf("bEnableRecvLog_body:\n");
+		scanf("%d", &nTmp);
+		pHttpConfig->bEnableRecvLog_body = nTmp;
+		printf("bEnableRecvLog_body:%d\n", pHttpConfig->bEnableRecvLog_body);
+
+		
+		printf("bUseWorkThrPool:\n");
+		scanf("%d", &nTmp);
+		g_bUseWorkThrPool = nTmp;
+		printf("bUseWorkThrPool:%d\n", g_bUseWorkThrPool);
+		if (1 == nTmp)
 		{
-			printf("please input gateno(must not the same as others)\n");
-			scanf("%d", &g_nGateNo);
+			int nPoolSize = 8;
+			printf("input wrok thread pool size:\n");
+			scanf("%d", &nPoolSize);
+
+			int nTaskQue = 100000;
+			printf("input thread pool task que maxsize:\n");
+			scanf("%d", &nTaskQue);
+
+			m_pThreadPool->SetMaxTaskQueueSize(nTaskQue);
+
+			m_pThreadPool->StartThreadPool(nPoolSize);
 		}
 
-		int nPoolSize = 8;
-		printf("input wrok thread pool size:\n");
-		scanf("%d", &nPoolSize);
-
-		int nTaskQue = 100000;
-		printf("input thread pool task que maxsize:\n");
-		scanf("%d", &nTaskQue);
-
-		m_pThreadPool->SetMaxTaskQueueSize(nTaskQue);
-
-		m_pThreadPool->StartThreadPool(nPoolSize);
-		
 		//http回调函数
 		pHttpConfig->pOnConnection	= func_on_connection_http;
 		pHttpConfig->pOnReadMsg_http= func_on_readmsg_http;
@@ -1113,6 +1190,8 @@ int main(int argc, char* argv[])
 		pHttpConfig->nMaxRecvBuf	= 32 * 1024;
 		pHttpConfig->nMaxSendQue	= 64;
 		
+		printf("----%d-%d-%d-%d-----\n", pHttpConfig->bEnableRecvLog, pHttpConfig->bEnableRecvLog_body, pHttpConfig->bEnableSendLog, pHttpConfig->bEnableSendLog_body);
+
 		//启动httpserver
 		err = pthread_create(&ntid, NULL, StartHttpServer, reinterpret_cast<void*>(pHttpConfig));
 		if (err != 0) printf("StartHttp can't create thread: %s\n", strerror(err));

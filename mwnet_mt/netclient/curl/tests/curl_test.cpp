@@ -41,22 +41,195 @@ const std::string http_url = "http://192.169.0.231:1235/sms/v2/std/single_send";
 //const std::string http_url = "http://61.145.229.28:7902/MWGate/wmgw.asmx/MongateCsSpSendSmsNew";
 char g_szHttpUrl[2048+1] = {0};
 char g_szHttpBody[4096+1] = {0};
+char g_smsPort[21 + 1] = { 0 };
+char g_aimUrl[32 + 1] = { 0 };
+char g_smsSign[64 + 1] = { 0 };
 int g_nKeepAlive = 0;
+int g_nConnectTimeout = 3;
+int g_nTotalTimeout = 10;
 
 using namespace MWNET_MT;
 using namespace MWNET_MT::CURL_HTTPCLIENT;
 using namespace MWSTRINGUTIL;
 
 std::atomic<uint64_t> rspErrCnt_;
+std::atomic<uint64_t> nsloolupCnt_1_;
+std::atomic<uint64_t> nsloolupCnt_2_;
+std::atomic<uint64_t> nsloolupCnt_3_;
+std::atomic<uint64_t> nsloolupCnt_4_;
+std::atomic<uint64_t> nsloolupCnt_5_;
+std::atomic<uint64_t> nsloolupCnt_6_;
+std::atomic<uint64_t> nsloolupCnt_7_;
+std::atomic<uint64_t> nsloolupCnt_8_;
+std::atomic<uint64_t> nsloolupCnt_9_;
+std::atomic<uint64_t> connectTimeOutCnt_1_;
+std::atomic<uint64_t> connectTimeOutCnt_2_;
+std::atomic<uint64_t> connectTimeOutCnt_3_;
+std::atomic<uint64_t> connectTimeOutCnt_4_;
+std::atomic<uint64_t> connectTimeOutCnt_5_;
+std::atomic<uint64_t> connectTimeOutCnt_6_;
+std::atomic<uint64_t> connectTimeOutCnt_7_;
+std::atomic<uint64_t> connectTimeOutCnt_8_;
+std::atomic<uint64_t> connectTimeOutCnt_9_;
+std::atomic<uint64_t> rspErrCnt_1_;
+std::atomic<uint64_t> rspErrCnt_2_;
+std::atomic<uint64_t> rspErrCnt_3_;
+std::atomic<uint64_t> rspErrCnt_4_;
+std::atomic<uint64_t> rspErrCnt_5_;
+std::atomic<uint64_t> rspErrCnt_6_;
+std::atomic<uint64_t> rspErrCnt_7_;
+std::atomic<uint64_t> rspErrCnt_8_;
+std::atomic<uint64_t> rspErrCnt_9_;
 FILE *g_fp = NULL;
 // 回调函数
 int func_onmsg_cb(void* pInvoker, uint64_t req_uuid, const boost::any& params, const HttpResponsePtr& response)
 {
-	if (response->GetErrCode() != 0 || response->GetRspCode() != 200)
+//err
+// 	if ((response->GetErrCode() != 0 || response->GetRspCode() != 200)
+// 		|| (response->GetRspCode() == 200 && response->GetErrCode() == 0)
+// 		)
 	{
-		++rspErrCnt_;
+		
+		if (response->GetErrCode() != 0 || response->GetRspCode() != 200)
+		{
+			++rspErrCnt_;
+			LOG_INFO
+				<< "ErrReq ReqUUID:" << req_uuid << ",code:" << response->GetErrCode() << ",desc:" << response->GetErrDesc()
+				<< ",TotalConsuming:" << response->GetReqTotalConsuming() << "ms"
+				<< ",ConnectConsuming:" << response->GetReqConnectConsuming() << "ms"
+				<< ",NameloopupConsuming:" << response->GetReqNameloopupConsuming() << "ms"
+				<< ",ReqInQueTm:" << response->GetReqInQueTime()
+				<< ",ReqSendTm:" << response->GetReqSendTime()
+				<< ",RspRecvTm:" << response->GetRspRecvTime()
+				<< "\n" << response->GetHeader()
+				<< response->GetBody();
+
+		}
+		uint32_t nSpan = response->GetReqNameloopupConsuming();
+		if (nSpan < 80)
+		{
+			++nsloolupCnt_1_;
+		}
+		else if (nSpan >= 80 && nSpan < 100)
+		{
+			++nsloolupCnt_2_;
+		}
+		else if (nSpan >= 100 && nSpan < 150)
+		{
+			++nsloolupCnt_3_;
+		}
+		else if (nSpan >= 150 && nSpan < 200)
+		{
+			++nsloolupCnt_4_;
+		}
+		else if (nSpan >= 200 && nSpan < 300)
+		{
+			++nsloolupCnt_5_;
+		}
+		else if (nSpan >= 300 && nSpan < 500)
+		{
+			++nsloolupCnt_6_;
+		}
+		else if (nSpan >= 500 && nSpan < 1000)
+		{
+			++nsloolupCnt_7_;
+		}
+		else if (nSpan >= 1000 && nSpan < 2000)
+		{
+			++nsloolupCnt_8_;
+		}
+		else if (nSpan >= 2000)
+		{
+			++nsloolupCnt_9_;
+		}
+		nSpan = response->GetReqConnectConsuming();
+		if (nSpan < 80)
+		{
+			++connectTimeOutCnt_1_;
+		}
+		else if (nSpan >= 80 && nSpan < 100)
+		{
+			++connectTimeOutCnt_2_;
+		}
+		else if (nSpan >= 100 && nSpan < 150)
+		{
+			++connectTimeOutCnt_3_;
+		}
+		else if (nSpan >= 150 && nSpan < 200)
+		{
+			++connectTimeOutCnt_4_;
+		}
+		else if (nSpan >= 200 && nSpan < 300)
+		{
+			++connectTimeOutCnt_5_;
+		}
+		else if (nSpan >= 300 && nSpan < 500)
+		{
+			++connectTimeOutCnt_6_;
+		}
+		else if (nSpan >= 500 && nSpan < 1000)
+		{
+			++connectTimeOutCnt_7_;
+		}
+		else if (nSpan >= 1000 && nSpan < 2000)
+		{
+			++connectTimeOutCnt_8_;
+		}
+		else if (nSpan >= 2000)
+		{
+			++connectTimeOutCnt_9_;
+		}
+
+		nSpan = response->GetReqTotalConsuming();
+		if (nSpan < 80)
+		{
+			++rspErrCnt_1_;
+		}
+		else if (nSpan >= 80 && nSpan < 100)
+		{
+			++rspErrCnt_2_;
+		}
+		else if (nSpan >= 100 && nSpan < 150)
+		{
+			++rspErrCnt_3_;
+		}
+		else if (nSpan >= 150 && nSpan < 200)
+		{
+			++rspErrCnt_4_;
+		}
+		else if (nSpan >= 200 && nSpan < 300)
+		{
+			++rspErrCnt_5_;
+		}
+		else if (nSpan >= 300 && nSpan < 500)
+		{
+			++rspErrCnt_6_;
+		}
+		else if (nSpan >= 500 && nSpan < 1000)
+		{
+			++rspErrCnt_7_;
+		}
+		else if (nSpan >= 1000 && nSpan < 2000)
+		{
+			++rspErrCnt_8_;
+		}
+		else if (nSpan >= 2000)
+		{
+			++rspErrCnt_9_;
+		}
 		LOG_INFO
-			<< "URL:" << response->GetEffectiveUrl() << ",code:" << response->GetErrCode() << ",desc:" << response->GetErrDesc()
+			<< "ReqUUID:" << req_uuid << ",code:" << response->GetErrCode() << ",desc:" << response->GetErrDesc()
+			<< ",TotalConsuming:" << response->GetReqTotalConsuming() << "ms"
+			<< ",ConnectConsuming:" << response->GetReqConnectConsuming() << "ms"
+			<< ",NameloopupConsuming:" << response->GetReqNameloopupConsuming() << "ms"
+			<< ",ReqInQueTm:" << response->GetReqInQueTime()
+			<< ",ReqSendTm:" << response->GetReqSendTime()
+			<< ",RspRecvTm:" << response->GetRspRecvTime()
+			<< "\n" << response->GetHeader()
+			<< response->GetBody()
+			;
+		/*LOG_INFO
+			<< "URL:" << response->GetEffectiveUrl() << ",ReqUUID:" << req_uuid << ",code:" << response->GetErrCode() << ",desc:" << response->GetErrDesc()
 			<< "\n" << "ResponseCode:" << response->GetRspCode()
 			<< " TotalConsuming:" << response->GetReqTotalConsuming() << "ms"
 			<< " ConnectConsuming:" << response->GetReqConnectConsuming() << "ms"
@@ -67,8 +240,8 @@ int func_onmsg_cb(void* pInvoker, uint64_t req_uuid, const boost::any& params, c
 			<< "\n" << response->GetHeader()
 			<< response->GetBody()
 			;
+			*/
 	}
-
 	
 	return 0;
 }
@@ -95,6 +268,45 @@ std::string get_httpurl(const char* szPhone)
 	printf("req:%s\n", szBuf);
 	return std::string(szBuf);
 }
+void testMnps(int post_get, const std::string& strHttpUrl, const std::string& strHttpBody)
+{
+	std::string strBodyTmp = strHttpBody;
+	HttpRequestPtr http_request = http_cli->GetHttpRequest(strHttpUrl,
+		HTTP_1_1,
+		1 == post_get ? HTTP_REQUEST_POST : HTTP_REQUEST_GET,
+		g_nKeepAlive);
+	if (http_request)
+	{
+		///////////////// aim 能力 
+		time_t timestamp = time(NULL);
+		struct tm* tLogin = localtime(&timestamp);
+
+		char szTime[100] = { 0 };
+		sprintf(szTime, "%02d%02d%02d%02d%02d", tLogin->tm_mon + 1, tLogin->tm_mday,
+			tLogin->tm_hour, tLogin->tm_min, tLogin->tm_sec);
+		char szBuf[100] = { 0 };
+		sprintf(szBuf, "CMSABS00000000Fx1VEn8cefRbjhwJQO9rLlhXvHwR94Em%s", szTime);
+		std::string strMd5 = "";
+		MWSTRINGUTIL::StringUtil::ToMd5HexString(szBuf, strlen(szBuf), strMd5);
+		http_request->SetHeader("Userid", "CMSABS");
+		http_request->SetHeader("Pwd", strMd5);
+		http_request->SetHeader("Timestamp", szTime);
+
+		strBodyTmp = "{\"requestId\":\"56asdd-47503-abce\",\"proType\":\"RMS\",\"msgType\":\"RPT\",\"ecid\":500001,\"apiAcct\":\"TEST01\",\"pushUrl\":\"http://192.169.0.231:1234/sms/v2/std/single_send\",\"messages\":[{\"msgId\":\"2177343094593642363\",\"msglevel\":\"5\",\"payload\":{\"body\":\"hello\"},\"originTime\":\"20220125190012\",\"validTime\":\"20220225190012\"}]}";
+		//strBodyTmp = "{\"requestId\":\"56asdd-47503-abce\",\"items\":[{\"proType\":\"RMS\",\"msgType\":\"RPT\",\"ecid\":500001,\"apiAcct\":\"TEST01\",\"apiName\":\"test\",\"sendMode\":\"PUSH\",\"pushRule\": {\"common\": {\"pushVersion\": \"1\",\"pushUrl\": \"http://test.com/rpt/callback\",\"auth_accType\": \"MW\",\"retry_onOff\":\"ON\"}}}]}";
+		//printf("%s,%s\n", szBuf, strMd5.c_str());
+		////////////////////////////////
+		http_request->SetContentType("application/json;charset=UTF-8");
+		http_request->SetTimeOut(g_nConnectTimeout, g_nTotalTimeout);
+		http_request->SetBody(strBodyTmp);
+		boost::any params;
+		int nRet = http_cli->SendHttpRequest(http_request, params, true);
+		if (0 != nRet)
+		{
+			LOG_ERROR << "SendHttpRequest Error:" << nRet;
+		}
+	}
+}
 void testNormal(int post_get, const std::string& strHttpUrl, const std::string& strHttpBody)
 {
 	std::string strBodyTmp = strHttpBody;
@@ -105,8 +317,115 @@ void testNormal(int post_get, const std::string& strHttpUrl, const std::string& 
 	if (http_request)
 	{
 		LOG_DEBUG << "GetHttpRequest:" << http_request->GetReqUUID();
-		http_request->SetContentType("text/plain");
-		http_request->SetTimeOut(30, 60);
+
+		time_t timestamp = time(NULL);
+		struct tm* tLogin = localtime(&timestamp);
+
+		char szTime[100] = { 0 };
+		sprintf(szTime, "%02d%02d%02d%02d%02d", tLogin->tm_mon + 1, tLogin->tm_mday,
+			tLogin->tm_hour, tLogin->tm_min, tLogin->tm_sec);
+		char szBuf[100] = { 0 };
+		sprintf(szBuf, "CMSABS00000000Fx1VEn8cefRbjhwJQO9rLlhXvHwR94Em%s", szTime);
+		std::string strMd5 = "";
+		MWSTRINGUTIL::StringUtil::ToMd5HexString(szBuf, strlen(szBuf), strMd5);
+		//http_request->SetHeader("Userid", "CMSABS");
+		//http_request->SetHeader("Pwd", strMd5);
+		//http_request->SetHeader("Timestamp", szTime);
+		http_request->SetHeader("appid", "101080723");
+		http_request->SetHeader("timestamp","2021-1-13 11:11:13");
+		http_request->SetHeader("nonce", "123");
+		http_request->SetHeader("sign", "6edb4aff75a95ace2d948ee5c6bb2b14cff303a45788bf888b020b5d2ff3c6e5");
+		http_request->SetHeader("msgTraceId", "jianghb_test_" + std::to_string(http_request->GetReqUUID()));
+		http_request->SetHeader("traceid", "jianghb_888");
+		http_request->SetContentType("application/json");
+		http_request->SetTimeOut(g_nConnectTimeout, g_nTotalTimeout);
+		http_request->SetBody(strBodyTmp);
+		boost::any params;
+		int nRet = http_cli->SendHttpRequest(http_request, params, true);
+		if (0 != nRet)
+		{
+			LOG_ERROR << "SendHttpRequest Error:" << nRet;
+		}
+	}
+}
+
+void testOldFacPull(int post_get, const std::string& strHttpUrl, const char* szAimUrl, const char* szSmsPort, const char* szSmsSign)
+{
+	HttpRequestPtr http_request = http_cli->GetHttpRequest(strHttpUrl,
+		HTTP_1_1,
+		1 == post_get ? HTTP_REQUEST_POST : HTTP_REQUEST_GET,
+		g_nKeepAlive);
+	if (http_request)
+	{
+		LOG_DEBUG << "GetHttpRequest:" << http_request->GetReqUUID();
+
+		time_t timestamp = time(NULL);
+		struct tm* tLogin = localtime(&timestamp);
+
+		char szTime[100] = { 0 };
+		sprintf(szTime, "%02d%02d%02d%02d%02d", tLogin->tm_mon + 1, tLogin->tm_mday,
+			tLogin->tm_hour, tLogin->tm_min, tLogin->tm_sec);
+		char szBuf[100] = { 0 };
+		sprintf(szBuf, "CMSABS00000000Fx1VEn8cefRbjhwJQO9rLlhXvHwR94Em%s", szTime);
+		std::string strMd5 = "";
+		MWSTRINGUTIL::StringUtil::ToMd5HexString(szBuf, strlen(szBuf), strMd5);
+		//http_request->SetHeader("Userid", "CMSABS");
+		//http_request->SetHeader("Pwd", strMd5);
+		//http_request->SetHeader("Timestamp", szTime);
+		http_request->SetHeader("appid", "101080723");
+		http_request->SetHeader("timestamp", "2021-1-13 11:11:13");
+		http_request->SetHeader("nonce", "123");
+		http_request->SetHeader("sign", "6edb4aff75a95ace2d948ee5c6bb2b14cff303a45788bf888b020b5d2ff3c6e5");
+		http_request->SetHeader("msgTraceId", "jianghb_test_" + std::to_string(http_request->GetReqUUID()));
+		http_request->SetHeader("traceid", "jianghb_888");
+		http_request->SetContentType("application/json");
+		http_request->SetTimeOut(g_nConnectTimeout, g_nTotalTimeout);
+
+		char szBody[1024 + 1] = { 0 };
+		sprintf(szBody, "{\"aimUrl\":\"%s\",\"callSource\":0,\"simId\":\"%ld\",\"smsId\":\"%ld\",\"port\":\"%s\",\"oaId\":\"123456789\",\"smsSigns\":[\"%s\"]}",
+			szAimUrl, http_request->GetReqUUID(), http_request->GetReqUUID(), szSmsPort, szSmsSign);
+		std::string strBodyTmp(szBody);
+		http_request->SetBody(strBodyTmp);
+		boost::any params;
+		int nRet = http_cli->SendHttpRequest(http_request, params, true);
+		if (0 != nRet)
+		{
+			LOG_ERROR << "SendHttpRequest Error:" << nRet;
+		}
+	}
+}
+
+void testNewFacPull(int post_get, const std::string& strHttpUrl, const char* szAimUrl, const char* szSmsPort, const char* szSmsSign)
+{
+	HttpRequestPtr http_request = http_cli->GetHttpRequest(strHttpUrl,
+		HTTP_1_1,
+		1 == post_get ? HTTP_REQUEST_POST : HTTP_REQUEST_GET,
+		g_nKeepAlive);
+	if (http_request)
+	{
+		LOG_DEBUG << "GetHttpRequest:" << http_request->GetReqUUID();
+
+		time_t timestamp = time(NULL);
+		struct tm* tLogin = localtime(&timestamp);
+
+		char szTime[100] = { 0 };
+		sprintf(szTime, "%02d%02d%02d%02d%02d", tLogin->tm_mon + 1, tLogin->tm_mday,
+			tLogin->tm_hour, tLogin->tm_min, tLogin->tm_sec);
+		char szBuf[100] = { 0 };
+		sprintf(szBuf, "AP000400000000565326288923942912VCvckp%s", szTime);
+		std::string strMd5 = "";
+		MWSTRINGUTIL::StringUtil::ToMd5HexString(szBuf, strlen(szBuf), strMd5);
+		http_request->SetHeader("account", "AP0004");
+		http_request->SetHeader("pwd", strMd5);
+		http_request->SetHeader("timestamp", szTime);
+		http_request->SetHeader("ftpye", "HuaWei");
+		http_request->SetContentType("application/json");
+		http_request->SetTimeOut(g_nConnectTimeout, g_nTotalTimeout);
+
+		char szBody[1024+1] = { 0 };
+		sprintf(szBody, "{\"aimUrl\":\"%s\",\"callSource\":0,\"simId\":\"%ld\",\"smsId\":\"%ld\",\"port\":\"%s\",\"oaId\":\"123456789\",\"smsSigns\":[\"%s\"]}", 
+			szAimUrl, http_request->GetReqUUID(), http_request->GetReqUUID(), szSmsPort, szSmsSign);
+		std::string strBodyTmp(szBody);
 		http_request->SetBody(strBodyTmp);
 		boost::any params;
 		int nRet = http_cli->SendHttpRequest(http_request, params, true);
@@ -137,10 +456,10 @@ void testAim(int post_get, const std::string& strHttpUrl, const std::string& str
 		sprintf(szTime, "%02d%02d%02d%02d%02d", tLogin->tm_mon + 1, tLogin->tm_mday,
 			tLogin->tm_hour, tLogin->tm_min, tLogin->tm_sec);
 		char szBuf[100] = { 0 };
-		sprintf(szBuf, "AP002600000000147258%s", szTime);
+		sprintf(szBuf, "RCOSPT00000000QXxqzPiT%s", szTime);
 		std::string strMd5 = "";
 		MWSTRINGUTIL::StringUtil::ToMd5HexString(szBuf, strlen(szBuf), strMd5);
-		http_request->SetHeader("account", "AP0026");
+		http_request->SetHeader("account", "RCOSPT");
 		http_request->SetHeader("pwd", strMd5);
 		http_request->SetHeader("timestamp", szTime);
 
@@ -149,7 +468,7 @@ void testAim(int post_get, const std::string& strHttpUrl, const std::string& str
 ////////////////////////////////
 		http_request->SetContentType("application/json;charset=UTF-8");
 
-		http_request->SetTimeOut(30, 60);
+		http_request->SetTimeOut(g_nConnectTimeout, g_nTotalTimeout);
 		//http_request->SetKeepAliveTime();
 		//http_request->SetHeader("myheader1", "nothing1");
 		//http_request->SetHeader("myheader2", "nothing2");
@@ -202,7 +521,7 @@ void testTextMatchSvr(int post_get, const std::string& strHttpUrl, const std::st
 		////////////////////////////////
 		http_request->SetContentType("application/json;charset=UTF-8");
 
-		http_request->SetTimeOut(30, 60);
+		http_request->SetTimeOut(g_nConnectTimeout, g_nTotalTimeout);
 		//http_request->SetKeepAliveTime();
 		//http_request->SetHeader("myheader1", "nothing1");
 		//http_request->SetHeader("myheader2", "nothing2");
@@ -251,6 +570,11 @@ int main(int argc, char* argv[])
 	int post_get = 1;
 	int64_t totalsend = 1;
 	int max_conn = 1000;
+	int nMode = 1;
+	int nFacPullType = 1;
+
+	printf("select test mode? 1: normal test 2: test cmcc facpull \n");
+	scanf("%d", &nMode);
 
 	printf("PrintLog? 1: print to console 0: output to file \n");
 	scanf("%d", &bPrintLog);
@@ -265,6 +589,12 @@ int main(int argc, char* argv[])
 	printf("1: keepalive 0: close\n");
 	scanf("%d", &g_nKeepAlive);
 
+	printf("connect timeout(s):\n");
+	scanf("%d", &g_nConnectTimeout);
+
+	printf("total timeout(s):\n");
+	scanf("%d", &g_nTotalTimeout);
+
 	printf("test loop cnt:\n");
 	scanf("%ld", &totalsend);
 
@@ -276,16 +606,41 @@ int main(int argc, char* argv[])
 	printf("WorkThrNum:\n");
 	scanf("%d", &nWorkThr);
 
+	int nThrQueSize = 1000;
+	printf("WorkThrQueSize:\n");
+	scanf("%d", &nThrQueSize);
+
 	int nLogLevel = 2;
 	printf("LogLevel 0-TRACE 1-DEBUG 2-INFO:\n");
 	scanf("%d", &nLogLevel);
 
-	printf("input http url:\n");
-	scanf("%s", g_szHttpUrl);
+	// cmcc facpull
+	if (2 == nMode)
+	{
+		printf("facpullType 1-old facpull 2-new facpull:\n");
+		scanf("%d", &nFacPullType);
 
-	printf("input http body:\n");
-	scanf("%s", g_szHttpBody);
-	
+		printf("input http url:\n");
+		scanf("%s", g_szHttpUrl);
+
+		printf("input aimUrl:\n");
+		scanf("%s", g_aimUrl);
+
+		printf("input smsPort:\n");
+		scanf("%s", g_smsPort);
+
+		printf("input smsSign:\n");
+		scanf("%s", g_smsSign);
+	}
+	else
+	{
+		printf("input http url:\n");
+		scanf("%s", g_szHttpUrl);
+
+		printf("input http body:\n");
+		scanf("%s", g_szHttpBody);
+	}
+
 	if (!bPrintLog)
 	{
 		mkdir("./curltestlogs", 0755);
@@ -312,7 +667,7 @@ int main(int argc, char* argv[])
 	http_cli->InitHttpClient(NULL, func_onmsg_cb, nIoThr, max_conn, max_conn);
 	//初始化并启动发送线程
 	ThreadPoolPtr pPool(new mwnet_mt::ThreadPool("testcurl"));
-	pPool->setMaxQueueSize(10000);
+	pPool->setMaxQueueSize(nThrQueSize);
 	pPool->start(nWorkThr);
 
 	//loop test.......
@@ -355,45 +710,90 @@ int main(int argc, char* argv[])
 	{
 	while (ttmp < totalsend)
 	{
-		// loop add threadpool
-		if (pPool->TryRun(std::bind(testNormal, post_get, g_szHttpUrl, g_szHttpBody)))
+		if (1 == nMode)
 		{
-			++ttmp;
-			//usleep(1);
+			// loop add threadpool
+			pPool->run(std::bind(testNormal, post_get, g_szHttpUrl, g_szHttpBody));
 		}
-		
+		// cmcc facpull
+		else if (2 == nMode)
+		{
+			// old
+			if (1 == nFacPullType)
+			{
+				// loop add threadpool
+				pPool->run(std::bind(testOldFacPull, post_get, g_szHttpUrl, g_aimUrl, g_smsPort,  g_smsSign));
+			}
+			// new
+			else if (2 == nFacPullType)
+			{
+				// loop add threadpool
+				pPool->run(std::bind(testNewFacPull, post_get, g_szHttpUrl, g_aimUrl, g_smsPort, g_smsSign));
+			}
+		}
+
+		++ttmp;
+
 		// 实时速度 1秒一次
 		if ((time(NULL) - t2) >= 1)
 		{
-			printf("totalCnt:%ld,thrPoolQue:%ld,waitSndCnt:%ld,waitRspCnt:%ld,rspErr:%lu,spd:%ld\n",
+			printf("totalCnt:%ld,thrPoolQue:%ld,waitSndCnt:%ld,waitRspCnt:%ld,rspErrCnt:%lu,QPS:%ld\n"
+				"----------timeCost(nslookupTime/connectTime/totalTime/percent)----------\n"
+				"0-80ms     :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+				"80-100ms   :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+				"100-150ms  :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+				"150-200ms  :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+				"200-300ms  :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+				"300-500ms  :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+				"500-1000ms :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+				"1000-2000ms:%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+				"2000-....ms:%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n",
 				ttmp, pPool->queueSize(),
 				http_cli->GetWaitReqCnt(),
 				http_cli->GetWaitRspCnt(),
 				rspErrCnt_.load(),
-				static_cast<int64_t>((ttmp - __last) / (time(NULL) - t2)) * 1);
-
+				static_cast<int64_t>((ttmp - __last) / (time(NULL) - t2)) * 1,
+				nsloolupCnt_1_.load(), static_cast<double>(nsloolupCnt_1_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_1_.load(), static_cast<double>(connectTimeOutCnt_1_.load()) / static_cast<double>(ttmp), rspErrCnt_1_.load(), static_cast<double>(rspErrCnt_1_.load()) / static_cast<double>(ttmp),
+				nsloolupCnt_2_.load(), static_cast<double>(nsloolupCnt_2_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_2_.load(), static_cast<double>(connectTimeOutCnt_2_.load()) / static_cast<double>(ttmp), rspErrCnt_2_.load(), static_cast<double>(rspErrCnt_2_.load()) / static_cast<double>(ttmp),
+				nsloolupCnt_3_.load(), static_cast<double>(nsloolupCnt_3_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_3_.load(), static_cast<double>(connectTimeOutCnt_3_.load()) / static_cast<double>(ttmp), rspErrCnt_3_.load(), static_cast<double>(rspErrCnt_3_.load()) / static_cast<double>(ttmp),
+				nsloolupCnt_4_.load(), static_cast<double>(nsloolupCnt_4_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_4_.load(), static_cast<double>(connectTimeOutCnt_4_.load()) / static_cast<double>(ttmp), rspErrCnt_4_.load(), static_cast<double>(rspErrCnt_4_.load()) / static_cast<double>(ttmp),
+				nsloolupCnt_5_.load(), static_cast<double>(nsloolupCnt_5_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_5_.load(), static_cast<double>(connectTimeOutCnt_5_.load()) / static_cast<double>(ttmp), rspErrCnt_5_.load(), static_cast<double>(rspErrCnt_5_.load()) / static_cast<double>(ttmp),
+				nsloolupCnt_6_.load(), static_cast<double>(nsloolupCnt_6_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_6_.load(), static_cast<double>(connectTimeOutCnt_6_.load()) / static_cast<double>(ttmp), rspErrCnt_6_.load(), static_cast<double>(rspErrCnt_6_.load()) / static_cast<double>(ttmp),
+				nsloolupCnt_7_.load(), static_cast<double>(nsloolupCnt_7_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_7_.load(), static_cast<double>(connectTimeOutCnt_7_.load()) / static_cast<double>(ttmp), rspErrCnt_7_.load(), static_cast<double>(rspErrCnt_7_.load()) / static_cast<double>(ttmp),
+				nsloolupCnt_8_.load(), static_cast<double>(nsloolupCnt_8_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_8_.load(), static_cast<double>(connectTimeOutCnt_8_.load()) / static_cast<double>(ttmp), rspErrCnt_8_.load(), static_cast<double>(rspErrCnt_8_.load()) / static_cast<double>(ttmp),
+				nsloolupCnt_9_.load(), static_cast<double>(nsloolupCnt_9_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_9_.load(), static_cast<double>(connectTimeOutCnt_9_.load()) / static_cast<double>(ttmp), rspErrCnt_9_.load(), static_cast<double>(rspErrCnt_9_.load()) / static_cast<double>(ttmp));
 			t2 = time(NULL);
 			__last = ttmp;
 		}
 	}
-	//http_cli->ExitHttpClient();
-	if (time(NULL) - t1 > 0)
-	{
-		printf("totalcnt:%ld,rspErr:%lu,spd:%ld\n",
-			totalsend,
-			rspErrCnt_.load(),
-			static_cast<int64_t>((totalsend) / (time(NULL) - t1)) * 1);
-		printf("totalCnt:%ld,thrPoolQue:%ld,waitSndCnt:%ld,waitRspCnt:%ld,rspErr:%lu,spd:%ld\n",
-			ttmp, pPool->queueSize(),
-			http_cli->GetWaitReqCnt(),
-			http_cli->GetWaitRspCnt(),
-			rspErrCnt_.load(),
-			static_cast<int64_t>((ttmp) / (time(NULL) - t1)) * 1);
-	}
-	sleep(1);
-}
 
-	
+	sleep(10);
+
+	printf("Done...totalCnt:%ld,rspErr:%lu,QPS:%ld\n"
+		"----------timeCost(nslookupTime/connectTime/totalTime/percent)----------\n"
+		"0-80ms     :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+		"80-100ms   :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+		"100-150ms  :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+		"150-200ms  :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+		"200-300ms  :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+		"300-500ms  :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+		"500-1000ms :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+		"1000-2000ms:%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+		"2000-....ms:%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n",
+		ttmp, rspErrCnt_.load(),
+		static_cast<int64_t>(ttmp / (time(NULL) - t1)) * 1,
+		nsloolupCnt_1_.load(), static_cast<double>(nsloolupCnt_1_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_1_.load(), static_cast<double>(connectTimeOutCnt_1_.load()) / static_cast<double>(ttmp), rspErrCnt_1_.load(), static_cast<double>(rspErrCnt_1_.load()) / static_cast<double>(ttmp),
+		nsloolupCnt_2_.load(), static_cast<double>(nsloolupCnt_2_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_2_.load(), static_cast<double>(connectTimeOutCnt_2_.load()) / static_cast<double>(ttmp), rspErrCnt_2_.load(), static_cast<double>(rspErrCnt_2_.load()) / static_cast<double>(ttmp),
+		nsloolupCnt_3_.load(), static_cast<double>(nsloolupCnt_3_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_3_.load(), static_cast<double>(connectTimeOutCnt_3_.load()) / static_cast<double>(ttmp), rspErrCnt_3_.load(), static_cast<double>(rspErrCnt_3_.load()) / static_cast<double>(ttmp),
+		nsloolupCnt_4_.load(), static_cast<double>(nsloolupCnt_4_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_4_.load(), static_cast<double>(connectTimeOutCnt_4_.load()) / static_cast<double>(ttmp), rspErrCnt_4_.load(), static_cast<double>(rspErrCnt_4_.load()) / static_cast<double>(ttmp),
+		nsloolupCnt_5_.load(), static_cast<double>(nsloolupCnt_5_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_5_.load(), static_cast<double>(connectTimeOutCnt_5_.load()) / static_cast<double>(ttmp), rspErrCnt_5_.load(), static_cast<double>(rspErrCnt_5_.load()) / static_cast<double>(ttmp),
+		nsloolupCnt_6_.load(), static_cast<double>(nsloolupCnt_6_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_6_.load(), static_cast<double>(connectTimeOutCnt_6_.load()) / static_cast<double>(ttmp), rspErrCnt_6_.load(), static_cast<double>(rspErrCnt_6_.load()) / static_cast<double>(ttmp),
+		nsloolupCnt_7_.load(), static_cast<double>(nsloolupCnt_7_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_7_.load(), static_cast<double>(connectTimeOutCnt_7_.load()) / static_cast<double>(ttmp), rspErrCnt_7_.load(), static_cast<double>(rspErrCnt_7_.load()) / static_cast<double>(ttmp),
+		nsloolupCnt_8_.load(), static_cast<double>(nsloolupCnt_8_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_8_.load(), static_cast<double>(connectTimeOutCnt_8_.load()) / static_cast<double>(ttmp), rspErrCnt_8_.load(), static_cast<double>(rspErrCnt_8_.load()) / static_cast<double>(ttmp),
+		nsloolupCnt_9_.load(), static_cast<double>(nsloolupCnt_9_.load()) / static_cast<double>(ttmp), connectTimeOutCnt_9_.load(), static_cast<double>(connectTimeOutCnt_9_.load()) / static_cast<double>(ttmp), rspErrCnt_9_.load(), static_cast<double>(rspErrCnt_9_.load()) / static_cast<double>(ttmp));
+
+	sleep(3600);
+}
 
 	return 0;
 }

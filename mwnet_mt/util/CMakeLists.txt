@@ -45,3 +45,6 @@ target_link_libraries(util_timestamp_test mwnet_mt_util mwlogger)
 
 add_executable(util_countdownlatch_test tests/countdownlatch_test.cpp)
 target_link_libraries(util_countdownlatch_test mwnet_mt_util mwlogger) 
+
+#add_executable(util_codecvt_test tests/codecvt_test.cpp)
+#target_link_libraries(util_codecvt_test mwnet_mt_util mwlogger)

@@ -5,7 +5,7 @@
 #include <mwnet_mt/util/MWAtomicInt.h>
 #include <mwnet_mt/logger/MWLogger.h>
 #include <mwnet_mt/util/MWStringUtil.h>
-
+#include <mwnet_mt/util/MWTimestamp.h>
 
 #include <stdint.h>
 #include <pthread.h>
@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <cmath>
+#include <map>
 
 #pragma GCC diagnostic ignored "-Wold-style-cast"
 #pragma GCC diagnostic ignored "-Wconversion"
@@ -34,6 +35,7 @@ using namespace MWSAFELOCK;
 using namespace MWATOMICINT;
 using namespace MWLOGGER;
 using namespace MWSTRINGUTIL;
+using namespace MWTIMESTAMP;
 
 size_t get_executable_path(char* processdir, char* processname, size_t len)
 {
@@ -145,25 +147,16 @@ int main(int argc, char* argv[])
 	std::string strFormat = "";
 	printf(MWSTRINGUTIL::StringUtil::FormatString(strFormat, "%d",123456).c_str());	
 	printf("\n");
-	//{
-		MWEVENTLOOP::EventLoop evloop;
+	
 
-		
-		evloop.RunAfter(10.0, MyPrint1);
-		evloop.RunAfter(15.0, MyPrint2);
-		boost::any any_params;
-		for (int i = 0; i < 1000000; ++i)
-			{
-		//MWEVENTLOOP::TIMER_ID tmr_id = evloop.RunAfter(3.0, std::bind(DealTimeOut, i));
-			}
-		//evloop.RunEvery(1.0, MyPrint3);
+	printf("begin-100W sha1:%s\n", MWTIMESTAMP::Timestamp::Now().ToFormattedString().c_str());
+	for (int i = 0; i <= 10000000; ++i)
+	{
+		std::string sha1HexStr;
+		MWSTRINGUTIL::StringUtil::ToSha1HexString("8613265661403", sha1HexStr);
+	}
+	printf("end-100W sha1:%s\n", MWTIMESTAMP::Timestamp::Now().ToFormattedString().c_str());
 
-		//evloop.CancelTimer(tmr_id);
-		
-		//evloop.QuitLoop();
-	//}
-
-			
 	while(1)
 	{
 		sleep(1);
