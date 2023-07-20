@@ -225,6 +225,7 @@ int func_onmsg_cb(void* pInvoker, uint64_t req_uuid, const boost::any& params, c
 			<< ",ReqInQueTm:" << response->GetReqInQueTime()
 			<< ",ReqSendTm:" << response->GetReqSendTime()
 			<< ",RspRecvTm:" << response->GetRspRecvTime()
+			<< ",bDelay:" << (response->GetReqTotalConsuming()>100?1:0)
 			<< "\n" << response->GetHeader()
 			<< response->GetBody()
 			;

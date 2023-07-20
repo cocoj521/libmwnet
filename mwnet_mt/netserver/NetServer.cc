@@ -386,7 +386,6 @@ public:
 			LOG_INFO << "[TCP][SENDING]"
 				<< "[" << request_id << "]"
 				<< "[" << conn->getConnuuid() << "]"
-				<< "[" << conn->peerAddress().toIpPort() << "]"
 				<< ":" 
 				<< (m_ptrCtrlParams->g_bEnableSendLog_tcp_body?StringUtil::BytesToHexString(szMsg, nMsgLen):"LOG-DISABLE");
 		}
@@ -527,6 +526,14 @@ private:
 			
 			AddToConnList(conn);
 
+			if (m_ptrCtrlParams->g_bEnableRecvLog_tcp)
+			{
+				LOG_INFO << "[TCP][CONN-OK]"
+					<< "[0000000000000000000]"
+					<< "[" << conn->getConnuuid() << "]"
+					<< "[" << conn->peerAddress().toIpPort() << "]";
+			}
+
 			// 限制最大连接数
 			if (m_ptrCtrlParams->g_nCurrConnNum_Tcp.incrementAndGet() > m_ptrCtrlParams->g_nMaxConnNum_Tcp)
 		    {
@@ -582,7 +589,6 @@ private:
 			LOG_INFO << "[TCP][RECVOK ]"
 				<< "[" << request_id << "]"
 				<< "[" << conn->getConnuuid() << "]"
-				<< "[" << conn->peerAddress().toIpPort() << "]"
 				<< ":" 
 				<< (m_ptrCtrlParams->g_bEnableRecvLog_tcp_body?(pRecv ? StringUtil::BytesToHexString(pRecv, len) : "RECV NULL"):"LOG-DISABLE");
 		}
@@ -1528,7 +1534,6 @@ public:
 			LOG_INFO << "[HTTP][SENDING]"
 				<< "[" << request_id << "]"
 				<< "[" << conn->getConnuuid() << "]"
-				<< "[" << conn->peerAddress().toIpPort() << "]"
 				<< ":" 
 				<< (m_ptrCtrlParams->g_bEnableSendLog_http_body?rsp.GetHttpResponse():"LOG-DISABLE");
 		}
@@ -1668,6 +1673,14 @@ private:
 			
 			AddToConnList(conn);
 
+			if (m_ptrCtrlParams->g_bEnableRecvLog_http)
+			{
+				LOG_INFO << "[HTTP][CONN-OK]"
+					<< "[0000000000000000000]"
+					<< "[" << conn->getConnuuid() << "]"
+					<< "[" << conn->peerAddress().toIpPort() << "]";
+			}
+
 			// 限制最大连接数
 			if (m_ptrCtrlParams->g_nCurrConnNum_Http.incrementAndGet() > m_ptrCtrlParams->g_nMaxConnNum_Http)
 		    {
@@ -1787,7 +1800,6 @@ private:
 							LOG_INFO << "[HTTP][SENDING]"
 								<< "[" << request_id << "]"
 								<< "[" << conn->getConnuuid() << "]"
-								<< "[" << conn->peerAddress().toIpPort() << "]"
 								<< ":" << "100-continue";
 						}
 
@@ -1850,7 +1862,6 @@ private:
 				LOG_WARN << "[HTTP][SENDING]"
 					<< "[" << request_id << "]"
 					<< "[" << conn->getConnuuid() << "]"
-					<< "[" << conn->peerAddress().toIpPort() << "]"
 					<< ":" << strBadRequest << strErrMsg;
 
 				// 解析失败，直接生成失败的response,回:400
@@ -1883,7 +1894,6 @@ private:
 			LOG_INFO << "[HTTP][RECVING]"
 				<< "[" << request_id << "]"
 				<< "[" << conn->getConnuuid() << "]"
-				<< "[" << conn->peerAddress().toIpPort() << "]"
 				<< "[" << len << "]"
 				<< ":" 
 				<< (m_ptrCtrlParams->g_bEnableRecvLog_http_body?(pRecv ? strRecv : "RECV NULL") :"LOG-DISABLE");

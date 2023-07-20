@@ -777,7 +777,7 @@ void send_http_rsp(void* pInvoker, uint64_t conn_uuid, const boost::any& conn, c
 		rsp.SetStatusCode(200);
 		rsp.SetContentType("application/x-www-form-urlencoded; charset=utf-8");
 		std::string strBody;
-		pHttpReq->GetHttpRequestContent(strBody);
+		pHttpReq->GetBodyData(strBody);
 		rsp.SetResponseBody(strBody);
 	}
 
