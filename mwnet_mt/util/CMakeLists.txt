@@ -17,7 +17,11 @@ else()
 	add_library(mwnet_mt_util SHARED ${util_SRCS})
 endif()
 
+#if(CMAKE_BUILD_JEMALLOC)
+#target_link_libraries(mwnet_mt_util mwnet_mt_netbase mwnet_mt_base mwnet_mt_crypto dl jemalloc)
+#else()
 target_link_libraries(mwnet_mt_util mwnet_mt_netbase mwnet_mt_base mwnet_mt_crypto)
+#endif()
 
 install(TARGETS mwnet_mt_util DESTINATION lib)
 

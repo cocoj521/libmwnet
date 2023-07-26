@@ -98,6 +98,11 @@ string TcpConnection::getTcpInfoString() const
 	return buf;
 }
 
+size_t TcpConnection::getLoopQueSize() 
+{ 
+	return loop_->queueSize(); 
+}
+
 int TcpConnection::send(const void* data, int len, const boost::any& params, int timeout)
 {
 	return send(StringPiece(static_cast<const char*>(data), len), params, timeout);

@@ -1534,6 +1534,7 @@ public:
 			LOG_INFO << "[HTTP][SENDING]"
 				<< "[" << request_id << "]"
 				<< "[" << conn->getConnuuid() << "]"
+				<< "[" << conn->getLoopQueSize() << "]"
 				<< ":" 
 				<< (m_ptrCtrlParams->g_bEnableSendLog_http_body?rsp.GetHttpResponse():"LOG-DISABLE");
 		}
@@ -1552,6 +1553,7 @@ public:
 			LOG_WARN << "[HTTP][SENDERR]"
 				<< "[" << request_id << "]"
 				<< "[" << conn->getConnuuid() << "]"
+				<< "[" << conn->getLoopQueSize() << "]"
 				<< "[" << conn->peerAddress().toIpPort() << "]"
 				<< ":" << "SEND ERROR,ERCODE:" << nSendRet;
 		}
@@ -1678,6 +1680,7 @@ private:
 				LOG_INFO << "[HTTP][CONN-OK]"
 					<< "[0000000000000000000]"
 					<< "[" << conn->getConnuuid() << "]"
+					<< "[" << conn->getLoopQueSize() << "]"
 					<< "[" << conn->peerAddress().toIpPort() << "]";
 			}
 
@@ -1752,7 +1755,8 @@ private:
 					{
 						LOG_INFO << "[HTTP][RECVOK ]"
 							<< "[" << request_id << "]"
-							<< "[" << conn->getConnuuid() << "]";
+							<< "[" << conn->getConnuuid() << "]"
+							<< "[" << conn->getLoopQueSize() << "]";
 					}
 
 					int nReqType = reqptr->GetRequestType();				
@@ -1800,6 +1804,7 @@ private:
 							LOG_INFO << "[HTTP][SENDING]"
 								<< "[" << request_id << "]"
 								<< "[" << conn->getConnuuid() << "]"
+								<< "[" << conn->getLoopQueSize() << "]"
 								<< ":" << "100-continue";
 						}
 
@@ -1813,6 +1818,7 @@ private:
 							LOG_WARN << "[HTTP][SENDERR]"
 								<< "[" << request_id << "]"
 								<< "[" << conn->getConnuuid() << "]"
+								<< "[" << conn->getLoopQueSize() << "]"
 								<< "[" << conn->peerAddress().toIpPort() << "]"
 								<< ":" << "SEND ERROR,ERCODE:" << nSendRet;
 						}
@@ -1841,6 +1847,7 @@ private:
 				LOG_WARN << "[HTTP][RECVERR]"
 					<< "[" << request_id << "]"
 					<< "[" << conn->getConnuuid() << "]"
+					<< "[" << conn->getLoopQueSize() << "]"
 					<< ":" << strErrMsg;
 
 				// 将buf中的指针移归位
@@ -1862,6 +1869,7 @@ private:
 				LOG_WARN << "[HTTP][SENDING]"
 					<< "[" << request_id << "]"
 					<< "[" << conn->getConnuuid() << "]"
+					<< "[" << conn->getLoopQueSize() << "]"
 					<< ":" << strBadRequest << strErrMsg;
 
 				// 解析失败，直接生成失败的response,回:400
@@ -1872,6 +1880,7 @@ private:
 					LOG_WARN << "[HTTP][SENDERR]"
 						<< "[" << request_id << "]"
 						<< "[" << conn->getConnuuid() << "]"
+						<< "[" << conn->getLoopQueSize() << "]"
 						<< "[" << conn->peerAddress().toIpPort() << "]"
 						<< ":" << "SEND ERROR,ERCODE:" << nSendRet;
 				}
@@ -1894,6 +1903,7 @@ private:
 			LOG_INFO << "[HTTP][RECVING]"
 				<< "[" << request_id << "]"
 				<< "[" << conn->getConnuuid() << "]"
+				<< "[" << conn->getLoopQueSize() << "]"
 				<< "[" << len << "]"
 				<< ":" 
 				<< (m_ptrCtrlParams->g_bEnableRecvLog_http_body?(pRecv ? strRecv : "RECV NULL") :"LOG-DISABLE");
@@ -1920,6 +1930,7 @@ private:
 			LOG_INFO << "[HTTP][SENDOK ]"
 				<< "[" << inner_params.request_id << "]"
 				<< "[" << conn->getConnuuid() << "]"
+				<< "[" << conn->getLoopQueSize() << "]"
 				<< "[" << conn->peerAddress().toIpPort() << "]"
 				<< "[REQTM:" << tm_req << "]"
 				<< "[SNDTM:" << tm_snd << "]";
@@ -1952,6 +1963,7 @@ private:
 		LOG_ERROR << "[HTTP][SENDERR]"
 			<< "[" << inner_params.request_id << "]"
 			<< "[" << conn->getConnuuid() << "]"
+			<< "[" << conn->getLoopQueSize() << "]"
 			<< "[" << conn->peerAddress().toIpPort() << "]"
 			<< ":" << "SEND ERROR,ERCODE:" << errCode;
 

@@ -71,6 +71,8 @@ include_directories(${PROJECT_SOURCE_DIR})
 
 include_directories(${PROJECT_SOURCE_DIR}/mwnet_mt/include)
 include_directories(${PROJECT_SOURCE_DIR}/mwnet_mt/include/libevent)
+include_directories(${PROJECT_SOURCE_DIR}/mwnet_mt/include/jemalloc)
+include_directories(${PROJECT_SOURCE_DIR}/mwnet_mt/include/gperftools)
 link_directories(${PROJECT_SOURCE_DIR}/mwnet_mt/lib)
 
 string(TOUPPER ${CMAKE_BUILD_TYPE} BUILD_TYPE)

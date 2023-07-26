@@ -87,6 +87,7 @@ class TcpConnection : noncopyable,
   size_t getMaxRecvBuf() { return m_nMaxRecvBuf; }
   void setMaxSendQue(size_t nMaxSendQue) { m_nMaxSendQue = nMaxSendQue; }
   size_t getMaxSendQue() { return m_nMaxSendQue; }
+  size_t getLoopQueSize();
   // void send(string&& message); // C++11
   int send(const void* message, int len, const boost::any& params, int timeout=0);
   int send(const StringPiece& message, const boost::any& params, int timeout=0);
