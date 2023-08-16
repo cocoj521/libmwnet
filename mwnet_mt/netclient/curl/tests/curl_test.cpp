@@ -44,9 +44,13 @@ char g_szHttpBody[4096+1] = {0};
 char g_smsPort[21 + 1] = { 0 };
 char g_aimUrl[32 + 1] = { 0 };
 char g_smsSign[64 + 1] = { 0 };
+char g_szAimAccount[32 + 1] = { 0 };
+char g_szAimAccPwd[64 + 1] = { 0 };
+int64_t g_nAimPhone = 13500000000;
 int g_nKeepAlive = 0;
 int g_nConnectTimeout = 3;
 int g_nTotalTimeout = 10;
+uint32_t g_nMaxDelay = 100;
 
 using namespace MWNET_MT;
 using namespace MWNET_MT::CURL_HTTPCLIENT;
@@ -106,11 +110,11 @@ int func_onmsg_cb(void* pInvoker, uint64_t req_uuid, const boost::any& params, c
 
 		}
 		uint32_t nSpan = response->GetReqNameloopupConsuming();
-		if (nSpan < 80)
+		if (nSpan < 50)
 		{
 			++nsloolupCnt_1_;
 		}
-		else if (nSpan >= 80 && nSpan < 100)
+		else if (nSpan >= 50 && nSpan < 100)
 		{
 			++nsloolupCnt_2_;
 		}
@@ -143,11 +147,11 @@ int func_onmsg_cb(void* pInvoker, uint64_t req_uuid, const boost::any& params, c
 			++nsloolupCnt_9_;
 		}
 		nSpan = response->GetReqConnectConsuming();
-		if (nSpan < 80)
+		if (nSpan < 50)
 		{
 			++connectTimeOutCnt_1_;
 		}
-		else if (nSpan >= 80 && nSpan < 100)
+		else if (nSpan >= 50 && nSpan < 100)
 		{
 			++connectTimeOutCnt_2_;
 		}
@@ -181,11 +185,11 @@ int func_onmsg_cb(void* pInvoker, uint64_t req_uuid, const boost::any& params, c
 		}
 
 		nSpan = response->GetReqTotalConsuming();
-		if (nSpan < 80)
+		if (nSpan < 50)
 		{
 			++rspErrCnt_1_;
 		}
-		else if (nSpan >= 80 && nSpan < 100)
+		else if (nSpan >= 50 && nSpan < 100)
 		{
 			++rspErrCnt_2_;
 		}
@@ -225,7 +229,7 @@ int func_onmsg_cb(void* pInvoker, uint64_t req_uuid, const boost::any& params, c
 			<< ",ReqInQueTm:" << response->GetReqInQueTime()
 			<< ",ReqSendTm:" << response->GetReqSendTime()
 			<< ",RspRecvTm:" << response->GetRspRecvTime()
-			<< ",bDelay:" << (response->GetReqTotalConsuming()>100?1:0)
+			<< ",bDelay:" << (response->GetReqTotalConsuming()>g_nMaxDelay?1:0)
 			<< "\n" << response->GetHeader()
 			<< response->GetBody()
 			;
@@ -340,6 +344,47 @@ void testNormal(int post_get, const std::string& strHttpUrl, const std::string& 
 		http_request->SetHeader("traceid", "jianghb_888");
 		http_request->SetContentType("application/json");
 		http_request->SetTimeOut(g_nConnectTimeout, g_nTotalTimeout);
+		http_request->SetBody(strBodyTmp);
+		boost::any params;
+		int nRet = http_cli->SendHttpRequest(http_request, params, true);
+		if (0 != nRet)
+		{
+			LOG_ERROR << "SendHttpRequest Error:" << nRet;
+		}
+	}
+}
+
+void testAimPhoneAbility(const std::string& strHttpUrl, const std::string& strAimAccount, const std::string& strAimAccPwd, const int64_t nAimPhone)
+{
+	HttpRequestPtr http_request = http_cli->GetHttpRequest(strHttpUrl,
+		HTTP_1_1,
+		HTTP_REQUEST_POST,
+		g_nKeepAlive);
+	if (http_request)
+	{
+		LOG_DEBUG << "GetHttpRequest:" << http_request->GetReqUUID();
+
+		time_t timestamp = time(NULL);
+		struct tm* tLogin = localtime(&timestamp);
+
+		char szTime[100] = { 0 };
+		sprintf(szTime, "%02d%02d%02d%02d%02d", tLogin->tm_mon + 1, tLogin->tm_mday,
+			tLogin->tm_hour, tLogin->tm_min, tLogin->tm_sec);
+		char szEncPwd[100] = { 0 };
+		sprintf(szEncPwd, "%s00000000%s%s", strAimAccount.c_str(), strAimAccPwd.c_str(), szTime);
+		std::string strMd5Pwd = "";
+		MWSTRINGUTIL::StringUtil::ToMd5HexString(szEncPwd, strlen(szEncPwd), strMd5Pwd);
+		http_request->SetHeader("account", strAimAccount);
+		http_request->SetHeader("timestamp", szTime);
+		http_request->SetHeader("pwd", strMd5Pwd);
+		http_request->SetContentType("application/json");
+		http_request->SetTimeOut(g_nConnectTimeout, g_nTotalTimeout);
+		std::string strPhoneSHA1 = "";
+		MWSTRINGUTIL::StringUtil::ToSha1HexString(std::to_string(nAimPhone), strPhoneSHA1);
+		std::string strBodyTmp = "";
+		MWSTRINGUTIL::StringUtil::FormatString(strBodyTmp,
+			"{\"mobiles\":[{\"mobile\":\"%s\",\"custId\":\"123456789012345678901234567890\",\"extData\":\"123456789012345678901234567890\"}]}",
+			strPhoneSHA1.c_str());
 		http_request->SetBody(strBodyTmp);
 		boost::any params;
 		int nRet = http_cli->SendHttpRequest(http_request, params, true);
@@ -573,8 +618,9 @@ int main(int argc, char* argv[])
 	int max_conn = 1000;
 	int nMode = 1;
 	int nFacPullType = 1;
+	std::atomic<int64_t> nAimPhone;
 
-	printf("select test mode? 1: normal test 2: test cmcc facpull \n");
+	printf("select test mode? 1: normal test 2: test cmcc facpull 3: test aimPhoneAbility\n");
 	scanf("%d", &nMode);
 
 	printf("PrintLog? 1: print to console 0: output to file \n");
@@ -632,6 +678,24 @@ int main(int argc, char* argv[])
 
 		printf("input smsSign:\n");
 		scanf("%s", g_smsSign);
+	}
+	else if (3 == nMode)
+	{
+		printf("input http url(/ApiService/v1/AddressManage/queryAimAbility):\n");
+		scanf("%s", g_szHttpUrl);
+
+		printf("input account(AP0613):\n");
+		scanf("%s", g_szAimAccount);
+
+		printf("input pwd:\n");
+		scanf("%s", g_szAimAccPwd);
+
+		printf("input phone(8613500000000,auto inc):\n");
+		scanf("%ld", &g_nAimPhone);
+		nAimPhone = g_nAimPhone;
+
+		printf("input maxRecordDelay(100ms):\n");
+		scanf("%d", &g_nMaxDelay);
 	}
 	else
 	{
@@ -732,6 +796,12 @@ int main(int argc, char* argv[])
 				pPool->run(std::bind(testNewFacPull, post_get, g_szHttpUrl, g_aimUrl, g_smsPort, g_smsSign));
 			}
 		}
+		// aim phone ability
+		else if (3 == nMode)
+		{
+			++nAimPhone;
+			pPool->run(std::bind(testAimPhoneAbility, g_szHttpUrl, g_szAimAccount, g_szAimAccPwd, nAimPhone.load()));
+		}
 
 		++ttmp;
 
@@ -740,8 +810,8 @@ int main(int argc, char* argv[])
 		{
 			printf("totalCnt:%ld,thrPoolQue:%ld,waitSndCnt:%ld,waitRspCnt:%ld,rspErrCnt:%lu,QPS:%ld\n"
 				"----------timeCost(nslookupTime/connectTime/totalTime/percent)----------\n"
-				"0-80ms     :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
-				"80-100ms   :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+				"0-50ms     :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+				"50-100ms   :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
 				"100-150ms  :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
 				"150-200ms  :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
 				"200-300ms  :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
@@ -772,8 +842,8 @@ int main(int argc, char* argv[])
 
 	printf("Done...totalCnt:%ld,rspErr:%lu,QPS:%ld\n"
 		"----------timeCost(nslookupTime/connectTime/totalTime/percent)----------\n"
-		"0-80ms     :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
-		"80-100ms   :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+		"0-50ms     :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
+		"50-100ms   :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
 		"100-150ms  :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
 		"150-200ms  :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"
 		"200-300ms  :%9lu/%.4f/%9lu/%.4f/%9lu/%.4f\n"

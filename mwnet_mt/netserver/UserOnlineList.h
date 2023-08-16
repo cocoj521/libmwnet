@@ -8,6 +8,7 @@
 #include <memory>
 #include <mutex>
 #include <map>
+#include <vector>
 #include <mwnet_mt/util/MWTimestamp.h>
 
 

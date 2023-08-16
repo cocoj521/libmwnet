@@ -345,8 +345,8 @@ const char* LogLevelName[NUM_LOG_LEVELS] =
 {
   "[TRACE]",
   "[DEBUG]",
-  "[INFO ]",
-  "[WARN ]",
+  "[INFO]",
+  "[WARN]",
   "[ERROR]",
   "[FATAL]",
 };
@@ -360,7 +360,7 @@ const char* strerror_tl(int savedErrno)
 std::string format_file_line(int line)
 {
 	char buf[10 + 1] = { 0 };
-	snprintf(buf, 10, "%4d", line);
+	snprintf(buf, 10, "%d", line);
 	return buf;
 }
 
@@ -392,13 +392,13 @@ Impl::Impl(MWLOGGER::LOG_LEVEL level, int savedErrno, const SourceFile& file, in
 	formatTime();
 	stream_ << LogLevelName[level];
 	mwnet_mt::CurrentThread::tid();
-	stream_ << '[' <<T(mwnet_mt::CurrentThread::tidString(), mwnet_mt::CurrentThread::tidStringLength())<<"]";
-	stream_ << '[' << basename_ << "::" << func << ',' << format_file_line(line_) << "]";
+	stream_ << "[" << T(mwnet_mt::CurrentThread::tidString(), mwnet_mt::CurrentThread::tidStringLength()) << "]";
+	stream_ << "[" << basename_ << "::" << func << "," << format_file_line(line_) << "]";
 	if (savedErrno != 0)
 	{
-		stream_ << ' ' << strerror_tl(savedErrno) << " (errno:" << savedErrno << ')';
+		stream_ << "[errno=" << savedErrno << ",\"" << strerror_tl(savedErrno) << "\"]";
 	}
-	stream_ << " -  ";
+	stream_ << " - ";
 }
 
 void Impl::formatTime()
@@ -409,7 +409,7 @@ void Impl::formatTime()
     gettimeofday(&tv, NULL);
     localtime_r(&tv.tv_sec, &t);
 	sprintf(t_time, 
-		"%04d-%02d-%02d %02d:%02d:%02d.%03d ", 
+		"[%04d-%02d-%02dT%02d:%02d:%02d.%03d+08:00]", 
 		t.tm_year + 1900, 
 		t.tm_mon + 1, 
 		t.tm_mday, 

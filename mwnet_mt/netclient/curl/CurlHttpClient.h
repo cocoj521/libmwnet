@@ -7,6 +7,7 @@
 #include <string>
 #include <memory>
 #include <atomic>
+#include <vector>
 
 namespace MWNET_MT
 {
