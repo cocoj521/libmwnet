@@ -2,4 +2,4 @@
 // that can be found in the License file.
 #include <string>
 
-const std::string strVer = "lib_version:2.0.0.3 2023-07-26 15:33";
+const std::string strVer = "lib_version:2.0.0.4 2023-09-20 10:54";
