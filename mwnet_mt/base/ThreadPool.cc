@@ -180,44 +180,36 @@ bool ThreadPool::isFull() const
 
 void ThreadPool::runInThread()
 {
-  try
-  {
-    if (threadInitCallback_)
-    {
-      threadInitCallback_();
-    }
-    while (running_)
-    {
-      Task task(take());
-      if (task)
-      {
-        task();
-      }
-    }
-  }
-  catch (const Exception& ex)
-  {
-	fprintf(stderr, "exception caught in ThreadPool %s\n", name_.c_str());
-	fprintf(stderr, "reason: %s\n", ex.what());
-	fprintf(stderr, "stack trace: %s\n", ex.stackTrace());
-	LOG_SYSERR << "exception caught in ThreadPool:" << name_ << "\n" 
-			   << "reason: " << ex.what() << "\n"
-			   << "stack trace: " << ex.stackTrace() << "\n" ;
-    //abort();
-  }
-  catch (const std::exception& ex)
-  {
-	fprintf(stderr, "exception caught in ThreadPool %s\n", name_.c_str());
-	fprintf(stderr, "reason: %s\n", ex.what());
-	LOG_SYSERR << "exception caught in ThreadPool:" << name_ << "\n" 
-			   << "reason: " << ex.what() << "\n";
-    //abort();
-  }
-  catch (...)
-  {
-    fprintf(stderr, "unknown exception caught in ThreadPool %s\n", name_.c_str());
-	LOG_SYSERR << "unknown exception caught in ThreadPool:" << name_ << "\n"; 
-    //throw; // rethrow
-  }
+	if (threadInitCallback_)
+	{
+		threadInitCallback_();
+	}
+	while (running_)
+	{
+		try
+		{
+			Task task(take());
+			if (task)
+			{
+				task();
+			}
+		}
+		catch (const Exception& ex)
+		{
+			LOG_SYSERR	<< "exception caught in ThreadPool:" << name_ << "\n"
+						<< "reason:" << ex.what() << "\n"
+						<< "stack trace:" << ex.stackTrace() << "\n";
+		}
+		catch (const std::exception& ex)
+		{
+			LOG_SYSERR	<< "exception caught in ThreadPool:" << name_ << "\n"
+						<< "reason:" << ex.what() << "\n";
+		}
+		catch (...)
+		{
+			LOG_SYSERR	<< "exception caught in ThreadPool:" << name_ << "\n"
+						<< "reason:unknown" << "\n";
+		}
+	}
 }
 

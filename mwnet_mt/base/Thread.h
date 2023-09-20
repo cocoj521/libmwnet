@@ -35,6 +35,7 @@ class Thread : noncopyable
   const string& name() const { return name_; }
 
   static int numCreated() { return numCreated_.get(); }
+  const string& tname() { return name_; };
 
  private:
   void setDefaultName();

@@ -36,7 +36,7 @@ class EventLoop : noncopyable
  public:
   typedef std::function<void()> Functor;
 
-  EventLoop();
+  EventLoop(const string& name = string());
   ~EventLoop();  // force out-line dtor, for std::unique_ptr members.
 
   ///
@@ -172,6 +172,7 @@ class EventLoop : noncopyable
   std::vector<Functor> pendingFunctors_; // @GuardedBy mutex_
 
   std::shared_ptr<CountDownLatch> quitLatch_;
+  string name_;
 };
 
 }

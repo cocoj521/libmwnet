@@ -9,6 +9,7 @@
 #include <mwnet_mt/net/Poller.h>
 #include <mwnet_mt/net/SocketsOps.h>
 #include <mwnet_mt/net/TimerQueue.h>
+#include <mwnet_mt/base/Exception.h>
 
 #include <algorithm>
 #include <atomic>
@@ -58,7 +59,7 @@ EventLoop* EventLoop::getEventLoopOfCurrentThread()
 
 
 
-EventLoop::EventLoop()
+EventLoop::EventLoop(const string& name)
   : looping_(false),
     quit_(false),
     eventHandling_(false),
@@ -71,7 +72,8 @@ EventLoop::EventLoop()
     wakeupChannel_(new Channel(this, wakeupFd_)),
     idInpool_(0),
     currentActiveChannel_(NULL),
-    quitLatch_(new CountDownLatch(1))
+    quitLatch_(new CountDownLatch(1)),
+	name_(name)
 {
   LOG_TRACE << "EventLoop created " << this << " in thread " << threadId_;
   if (t_loopInThisThread)
@@ -112,24 +114,43 @@ void EventLoop::loop()
 
   while (!quit_)
   {
-    activeChannels_.clear();
-    pollReturnTime_ = poller_->poll(kPollTimeMs, &activeChannels_);
-    ++iteration_;
-    if (Logger::logLevel() <= Logger::TRACE)
-    {
-      printActiveChannels();
-    }
-    // TODO sort channel by priority
-    eventHandling_ = true;
-    for (ChannelList::iterator it = activeChannels_.begin();
-        it != activeChannels_.end(); ++it)
-    {
-      currentActiveChannel_ = *it;
-      currentActiveChannel_->handleEvent(pollReturnTime_);
-    }
-    currentActiveChannel_ = NULL;
-    eventHandling_ = false;
-    doPendingFunctors();
+	try
+	{
+		activeChannels_.clear();
+		pollReturnTime_ = poller_->poll(kPollTimeMs, &activeChannels_);
+		++iteration_;
+		if (Logger::logLevel() <= Logger::TRACE)
+		{
+			printActiveChannels();
+		}
+		// TODO sort channel by priority
+		eventHandling_ = true;
+		for (ChannelList::iterator it = activeChannels_.begin();
+			it != activeChannels_.end(); ++it)
+		{
+			currentActiveChannel_ = *it;
+			currentActiveChannel_->handleEvent(pollReturnTime_);
+		}
+		currentActiveChannel_ = NULL;
+		eventHandling_ = false;
+		doPendingFunctors();
+	}
+	catch (const Exception& ex)
+	{
+		LOG_SYSERR	<< "exception caught in EventLoop:" << name_ << "\n"
+					<< "reason:" << ex.what() << "\n"
+					<< "stack trace:" << ex.stackTrace() << "\n";
+	}
+	catch (const std::exception& ex)
+	{
+		LOG_SYSERR	<< "exception caught in EventLoop:" << name_ << "\n"
+					<< "reason:" << ex.what() << "\n";
+	}
+	catch (...)
+	{
+		LOG_SYSERR	<< "exception caught in EventLoop:" << name_ << "\n"
+					<< "reason:unknown" << "\n";
+	}
   }	
 
   LOG_TRACE << "EventLoop " << this << " stop looping";

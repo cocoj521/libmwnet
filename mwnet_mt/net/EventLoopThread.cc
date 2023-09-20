@@ -53,7 +53,7 @@ EventLoop* EventLoopThread::getloop()
 
 void EventLoopThread::threadFunc()
 {
-  EventLoop loop;
+  EventLoop loop(thread_.tname());
 
   if (callback_)
   {
