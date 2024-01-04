@@ -90,7 +90,7 @@ const char* g_module_logs[] =
 
 int main(int argc, char* argv[])
 {
-	LOG_INIT_PARAMS(0,1,100,3,7);
+	LOG_INIT_PARAMS(0,1,100,3,7,5);
 	LOG_CREATE("./", "testmwlogger/", MODULE_LOG_NUMS, g_module_logs, false);
 	LOG_SET_LEVEL(MWLOGGER::INFO);
 	LOG_INFO(MODULE_LOGS_DEFAULT,MWLOGGER::LOCAL_FILE)<<"test111test111test111test111test111test111test111";

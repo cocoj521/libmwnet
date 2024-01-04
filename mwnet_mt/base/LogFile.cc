@@ -18,7 +18,8 @@ LogFile::LogFile(const string& basepath,
                  size_t rollSize,
                  bool threadSafe,
                  int flushInterval,
-                 int checkEveryN)
+                 int checkEveryN,
+				 bool enableZip)
   : basepath_(basepath),
     basename_(basename),
     rollSize_(rollSize),
@@ -26,9 +27,12 @@ LogFile::LogFile(const string& basepath,
     checkEveryN_(checkEveryN),
     count_(0),
     mutex_(threadSafe ? new MutexLock : NULL),
+	enableZip_(enableZip),
+	toZipFileMutex_(enableZip ? new MutexLock : NULL),
     startOfPeriod_(0),
     lastRoll_(0),
-    lastFlush_(0)
+    lastFlush_(0),
+	nowlogfile_("")
 {
   assert(basename.find('/') == string::npos);
   rollFile();
@@ -125,7 +129,7 @@ bool LogFile::rollFile()
 
   if (now != lastRoll_)
   {
-   	string filename = getLogFileName(basepath_, basename_, now);
+   	string filename = getNewLogFileName(basepath_, basename_, now);
 	time_t start = (now + k8HourToSeconds_) / kRollPerSeconds_ * kRollPerSeconds_;
 	
     lastRoll_ = now;
@@ -142,14 +146,56 @@ bool LogFile::rollFile()
 		mkdirs(filename.c_str(), 0755);
     }
     // std::cout << "filename = " << filename << ", createDir = " << createDir << std::endl;
-    // sleep(5);
     file_.reset(new FileUtil::AppendFile(filename));
+
+	// 将旧文件丢入压缩队列
+	//zip -m /aa/bb/cc/xx.zip /aa/bb/cc/xx.log
+	addToZipList(nowlogfile_);
+
+	// 保存新文件全路径
+	nowlogfile_ = filename;
+
     return true;
   }
   return false;
 }
 
-string LogFile::getLogFileName(const string& basepath, const string& basename, time_t now)
+void LogFile::addToZipList(const string& logfilename)
+{
+	if (enableZip_ && toZipFileMutex_ && !logfilename.empty())
+	{
+		std::size_t pos = logfilename.find_last_of('/');
+		if (pos != std::string::npos)
+		{
+			_file_to_zip toZip;
+			toZip.t_ = time(NULL);
+			toZip.file_path_ = logfilename.substr(0, pos);
+			toZip.file_name_ = logfilename.substr(pos + 1);
+			MutexLockGuard lock(*toZipFileMutex_);
+			zipFileList_.push_back(toZip);
+		}
+	}
+}
+
+int LogFile::getToZipFile(int minutesAgo, string& filePath, string& fileName)
+{
+	int ret = -1;
+	if (enableZip_ && toZipFileMutex_)
+	{
+		MutexLockGuard lock(*toZipFileMutex_);
+		std::list<_file_to_zip>::iterator it = zipFileList_.begin();
+		if (it != zipFileList_.end() && time(NULL) - it->t_ >= minutesAgo*60)
+		{
+			filePath = it->file_path_;
+			fileName = it->file_name_;
+			zipFileList_.erase(it);
+			ret = 0;
+		}
+	}
+	return ret;
+}
+
+string LogFile::getNewLogFileName(const string& basepath, const string& basename, time_t now)
 {
   string filename;
   filename.reserve(basepath.size() + basename.size() + 64);

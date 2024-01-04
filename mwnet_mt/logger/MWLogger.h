@@ -82,11 +82,15 @@ public:
 	//roll_size,日志滚动的大小即每个日志文件的最大大小,单位:M,默认值100, 
 	//zip_day,日志压缩天数即压缩N天前的日志,单位:天,默认值3
 	//save_day,日志保存天数即超过N天前的日志会被删除,单位:天,默认值7
-	static void SetLogParams(int flush_freq=3, int flush_every=1000, int roll_size=100, int zip_day=3, int save_day=7);
+	//zip_minute,日志压缩分钟数即已切换的旧日志N分钟后会被压缩,单位:分,默认值5,>0时表示启动压缩
+	static void SetLogParams(int flush_freq=3, int flush_every=1000, int roll_size=100, int zip_day=3, int save_day=7, int zip_minute=5);
 
 	//step 2......
 	//创建一定数量的日志对象,传入不同的日志对象编号,以及日志对象名称
-	//basepath:日志路径  basedir:日志主目录  obj_cnt:日志路径下的主目录内创建多少个子日志 asynclog:是否异步记日志(异步会启线程记日志)
+	//basepath:日志路径(尽量填绝对路径,否则日志自动压缩备份功能会受影响,填""、"."、"./"内部分自动取程序运行的路径) 如: /home/aa/bb/
+	//basedir:日志主目录 如: netlogs/
+	//obj_cnt:日志路径下的主目录内创建多少个子日志 
+	//asynclog:是否异步记日志(异步会启线程记日志)
 	//目录结构 日志路径+日志主目录+子日志名称+YYMMDD+子日志名称-hhmmss.log
 	//如:/home/jhb/+logs+downloadlog+20180101+downloadlog-120530.log
 	static bool CreateLogObjs(const std::string& basepath, const std::string& basedir, int obj_cnt, const char* logs[], bool asynclog=false);
@@ -101,6 +105,9 @@ public:
 
 	//根据日志编号获取该日志的日志级别
 	static LOG_LEVEL GetLogLevel(int x/*日志对象编号*/);
+	
+	//获取程序运行目录,如:/home/aa/bb/
+	static bool GetExecDir(std::string& strExecDir);
 
 	//日志模块退出
 	static void Exit();
@@ -113,7 +120,7 @@ private:
 };
 
 //日志初始化参数
-#define LOG_INIT_PARAMS(p1,p2,p3,p4,p5) MWLOGGER::Logger::SetLogParams(p1,p2,p3,p4,p5)
+#define LOG_INIT_PARAMS(p1,p2,p3,p4,p5,p6) MWLOGGER::Logger::SetLogParams(p1,p2,p3,p4,p5,p6)
 
 //日志模块退出
 #define LOG_EXIT() MWLOGGER::Logger::Exit()
@@ -158,7 +165,7 @@ const char* g_module_logs[] =
 
 int main()
 {
-	LOG_INIT_PARAMS(0,1,100,3,7);
+	LOG_INIT_PARAMS(0,1,100,3,7,5);
 	LOG_CREATE("./", "testmwlogger/", MODULE_LOG_NUMS, g_module_logs, false);
 	LOG_SET_LEVEL(MWLOGGER::INFO);
 	LOG_INFO(MODULE_LOGS_DEFAULT,MWLOGGER::LOCAL_FILE)<<"test111test111test111test111test111test111test111";

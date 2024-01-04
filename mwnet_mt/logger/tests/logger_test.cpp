@@ -11,20 +11,22 @@ std::string getTime()
 	return tmp;
 }
 
-
 int main()
 {
-	const char* objLogp[] = {"zbs"};
-	MWLOGGER::Logger::SetLogParams();
-	MWLOGGER::Logger::CreateLogObjs("", "zbs", 1, objLogp, false);
-	int n = 0;
+	const char* objLogp[] = {"jhbtest"};
+	MWLOGGER::Logger::SetLogParams(0, 1, 10, 1, 7, 1);
+	std::string strExecDir = "./";
+	//MWLOGGER::Logger::GetExecDir(strExecDir);
+	printf("%s\n", strExecDir.c_str());
+	MWLOGGER::Logger::CreateLogObjs(strExecDir, "testmwlogger/", 1, objLogp, false);
+	//int n = 0;
 	while (1)
 	{
-		for (int i = 0; i < 1; i++)
+		for (int i = 0; i < 1000; i++)
 		{
-			LOG_INFO(i,OUTPUT_TYPE::LOCAL_FILE) << getTime();
+			LOG_INFO(0,OUTPUT_TYPE::LOCAL_FILE) << getTime();
 		}
-		LOG_INFO(0, OUTPUT_TYPE::PRINT_STDOUT).Format(">>%s-[%d]", getTime().c_str(), n++);
+		///LOG_INFO(0, OUTPUT_TYPE::PRINT_STDOUT) << getTime();
 		sleep(1);
 	}
 

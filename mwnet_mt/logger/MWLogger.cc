@@ -445,6 +445,7 @@ int g_flush_every = 1000;
 int g_roll_size = 100;
 int g_zip_day = 3;
 int g_save_day = 7;
+int g_zip_minute = 5;
 bool g_bAsyncLog = false;
 
 std::vector<std::string> g_vLogFiles;
@@ -478,6 +479,7 @@ public:
 	{
 		m_nZipDay = 3;
 		m_nSaveDay = 7;
+		m_nZipMinute = 5;
 		m_strBasePath = ".";
 		m_strBakPath = ".";
 
@@ -486,10 +488,11 @@ public:
 		m_ptrDealFileJob = nullptr;
 	};
 
-	void SetParams(int nZipDay, int nSaveDay, const std::string& strBakPath, const std::string& strBasePath, std::vector<std::string>& vFileNames)
+	void SetParams(int nZipDay, int nSaveDay, int nZipMinute, const std::string& strBakPath, const std::string& strBasePath, std::vector<std::string>& vFileNames)
 	{
 		m_nZipDay = nZipDay;
 		m_nSaveDay = nSaveDay;
+		m_nZipMinute = nZipMinute;
 		m_strBasePath = strBasePath;
 		m_strBakPath = strBakPath;
 		m_vFileNames.swap(vFileNames);
@@ -532,89 +535,74 @@ private:
 
 		while (!pThis->m_bExit)
 		{
-			pThis->DoJob();
+			//旧文件压缩任务
+			pThis->DoZipOldFileJob();
+			//跨天清理任务
+			pThis->DoCrossDayJob();
 
 			// 休眠5秒
 			sleep(5);
 		}
 	}
+	
+	bool DoZipOldFileJob()
+	{
+		for (auto it : g_arrLogs)
+		{
+			std::string strLogPath = "";
+			std::string strLogName = "";
+			int ret = -1;
+			while (it.logfileptr_ && 0 == (ret = it.logfileptr_->getToZipFile(m_nZipMinute, strLogPath, strLogName)))
+			{
+				//去".log"后缀
+				strLogName.erase(strLogName.end() - 4, strLogName.end());
+				//拼zip -m path/xx.zip path/xx.log命令
+				//cd path && tar -czvf xx.tar.gz xx.log && rm -rf xx.log 
+				std::string strZipCmd = "cd " + strLogPath + " && tar -czvf " + strLogName + ".tar.gz " + strLogName + ".log" + " && rm -rf " + strLogName + ".log";
+				//执行任务
+				system(strZipCmd.c_str());
+			}
+		}
+		return true;
+	}
 
-	bool DoJob()
+	bool DoCrossDayJob()
 	{
 		if (IsCrossDay())
 		{
 			for (auto it : m_vFileNames)
 			{
 				std::string strZipFile = GetZipFileName(m_strBakPath + it + "/", it);
+				//printf("%s\n",strZipFile.c_str());
+				//cd path && find ./ -mtime +N \( -name "*.log" -o -name "*.zip" \) -exec tar -czvPf path/aa/xx.tar.gz {} +;
+				//压缩日志目录中前N天的日志到指定目录
+				std::string zipfile = "cd " + m_strBasePath + it + " && find -mtime +" + std::to_string(m_nZipDay) + " \\( -name \"*.log\" -o -name \"*.tar.gz\" \\) -exec tar -czvPf " + strZipFile + " {} +; ";
+				//printf("%s\n", zipfile.c_str());
+				//删除日志目录中前N天的日志文件	
+				std::string delfile = "find " + m_strBasePath + it + " -mtime +" + std::to_string(m_nZipDay) + " \\( -name \"*.log\" -o -name \"*.tar.gz\" \\) | xargs rm {} -rf \\; "; 
 
-				//创建对应目录
-				std::string createDir;
-				std::size_t pos = strZipFile.find_last_of('/');
-				if (pos != std::string::npos)
-				{
-					createDir = strZipFile.substr(0, pos);
-					mkdir(createDir.c_str(), 0755);
-				}
-
-				//压缩目录中前N天的日志到指定目录
-				std::string zipfile = "find " + m_strBasePath + it + " -mtime +" + std::to_string(m_nZipDay) + " -name \"*.log\" -exec zip -r " + strZipFile + " {} \\; ";  
-				
-				//删除目录中前N天的日志文	
-				std::string delfile = "find " + m_strBasePath + it + " -mtime +" + std::to_string(m_nZipDay) + " -name \"*.log\" | xargs rm {} -rf \\; "; 
-				
-				//删除目录中空文件夹	
+				//删除日志目录中空文件夹	
 				std::string delemptyfile = "if [ \"`find " + m_strBasePath + it + " -name \"*\" -type d -empty`\" != \"" + m_strBasePath + it + "\" ]; then find " + m_strBasePath + it + " -type d -empty | xargs rm -rf {}; fi ";		
 				
-				//删除备份目录中前N的压缩文件
-				std::string bakfile = "find " + m_strBakPath + it + " -mtime +" + std::to_string(m_nSaveDay) + " -name \"*.zip\" | xargs rm {} -rf \\; ";
+				//删除备份目录中前N天的压缩文件
+				std::string bakfile = "find " + m_strBakPath + it + " -mtime +" + std::to_string(m_nSaveDay) + " -name \"*.tar.gz\" | xargs rm {} -rf \\; ";
 				
 				//删除备份目录中的空文件夹
-				std::string delbakemptyfile = "find " + m_strBakPath + it + " -name \"*\" -type d -empty | xargs  rm -rf \\; ";
-						
-																				   
+				//std::string delbakemptyfile = "find " + m_strBakPath + it + " -type d -empty | xargs rm -rf \\; ";
+				//printf("%s\n", delbakemptyfile.c_str());
+
 				//执行任务
 				system(zipfile.c_str());
 				system(delfile.c_str());
 				system(delemptyfile.c_str());
 				system(bakfile.c_str());
-				system(delbakemptyfile.c_str());
+				//system(delbakemptyfile.c_str());
 			}
 		}
 
 		return true;
 	}
-/*
-	bool DoJob()
-	{
-		if (IsCrossDay())
-		{
-			for (auto it : m_vFileNames)
-			{
-				std::string strZipFile = GetZipFileName(m_strBakPath + it + "/", it);
 
-				//创建对应目录
-				std::string createDir;
-				std::size_t pos = strZipFile.find_last_of('/');
-				if (pos != std::string::npos)
-				{
-					createDir = strZipFile.substr(0, pos);
-					mkdir(createDir.c_str(), 0755);
-				}
-
-				std::string str = "find " + m_strBasePath + it + " -mtime +" + std::to_string(m_nZipDay) + " -name \"*.log\" -exec zip -r " + strZipFile + " {} \\; "  //压缩目录中前N天的日志到指定目录
-					"&& find " + m_strBasePath + it + " -mtime +" + std::to_string(m_nZipDay) + " -name \"*.log\" -exec rm {} -rf \\; "								   //删除目录中前N天的日志文件
-					"&& find " + m_strBasePath + it + " -name \"*\" -type d -empty | xargs  rm -rf \\; "															   //删除目录中空文件夹						
-					"&& find " + m_strBakPath + it + " -mtime +" + std::to_string(m_nSaveDay) + " -name \"*.zip\" -exec rm {} -rf \\; "								   //删除备份目录中前N的压缩文件
-					"&& find " + m_strBakPath + it + " -name \"*\" -type d -empty | xargs  rm -rf";																	   //删除备份目录中的空文件夹
-
-				//执行任务
-				system(str.c_str());
-			}
-		}
-
-		return true;
-	}
-*/
 	// 是否跨天
 	static bool IsCrossDay()
 	{
@@ -639,21 +627,16 @@ private:
 
 	static std::string GetZipFileName(const std::string& basepath, const std::string& basename)
 	{
+		std::string filename = basepath;
+
 		time_t now = time(NULL);
-
-		std::string filename;
-		filename.reserve(basepath.size() + basename.size() + 64);
-		filename = basepath;
-
-		char datebuf[16];
-		char timebuf[16];
-
 		struct tm tm;
 		localtime_r(&now, &tm);
-		strftime(datebuf, sizeof datebuf, "%Y%m%d/", &tm);
-		strftime(timebuf, sizeof timebuf, "-%H%M%S", &tm);
+		char datebuf[16] = { 0 };
+		strftime(datebuf, sizeof datebuf, "%Y%m%d%H%M%S", &tm);
 
-		filename.append(datebuf).append(basename).append(timebuf).append(".zip");
+		filename.append(basename).append("-").append(datebuf).append(".tar.gz");
+
 		return filename;
 	}
 
@@ -662,6 +645,7 @@ private:
 
 	int m_nZipDay;								//压缩多少前的日志
 	int m_nSaveDay;								//删除多少前的日志
+	int m_nZipMinute;							//压缩多少分钟前的日志
 	bool m_IsCross;								//跨天标志
 	std::string m_strBasePath;					//要处理文件的路径
 	std::string m_strBakPath;					//要备份的路径
@@ -796,17 +780,43 @@ void Logger::SetLogLevel(int x, MWLOGGER::LOG_LEVEL level)
 
 }
 
-void Logger::SetLogParams(int flush_freq, int flush_every, int roll_size, int zip_day, int save_day)
+void Logger::SetLogParams(int flush_freq, int flush_every, int roll_size, int zip_day, int save_day, int zip_minute)
 {
+	zip_day -= 1;
+	save_day -= 1;
 	g_flush_freq = flush_freq;
 	g_flush_every = flush_every;
 	g_roll_size = roll_size;
-	g_zip_day = zip_day;
-	g_save_day = save_day;
+	g_zip_day = zip_day < 0 ? 0 : zip_day;
+	g_save_day = save_day < 0 ? 0 : save_day;
+	g_zip_minute = zip_minute;
+}
+
+bool Logger::GetExecDir(std::string& strExecDir)
+{
+	char processdir[256 + 1] = { 0 };
+	char path[256 + 1] = { 0 };
+	char processname[256 + 1] = { 0 };
+	char* path_end = NULL;
+	if (::readlink("/proc/self/exe", processdir, sizeof(path)) <= 0) return false;
+	path_end = strrchr(processdir, '/');
+	if (path_end == NULL)  return false;
+	++path_end;
+	strcpy(processname, path_end);
+	*path_end = '\0';
+	strExecDir = "";
+	strExecDir.append(processdir);
+	return true;
 }
 
 bool Logger::CreateLogObjs(const std::string& basepath, const std::string& basedir, int obj_cnt, const char* logs[], bool asynclog)
 {
+	std::string _basepath = basepath;
+	if (_basepath == "" || _basepath == "." || _basepath == "./")
+	{
+		GetExecDir(_basepath);
+	}
+	//printf("%s\n", _basepath.c_str());
 	if (asynclog)
 	{
 		g_bAsyncLog = asynclog;
@@ -819,10 +829,10 @@ bool Logger::CreateLogObjs(const std::string& basepath, const std::string& based
 			g_vLogFiles.push_back(asyncLogObj.name_);
 
 			//创建目录.....
-			mkdir((basepath + basedir).c_str(), 0755);
-			mkdir((basepath + basedir + asyncLogObj.name_).c_str(), 0755);
+			mkdir((_basepath + basedir).c_str(), 0755);
+			mkdir((_basepath + basedir + asyncLogObj.name_).c_str(), 0755);
 
-			asyncLogObj.asynLogfileptr_.reset(new mwnet_mt::AsyncLogging((basepath + basedir + asyncLogObj.name_ + "/"), asyncLogObj.name_, 1024 * 1024 * g_roll_size, g_flush_freq));
+			asyncLogObj.asynLogfileptr_.reset(new mwnet_mt::AsyncLogging((_basepath + basedir + asyncLogObj.name_ + "/"), asyncLogObj.name_, 1024 * 1024 * g_roll_size, g_flush_freq));
 
 			asyncLogObj.asynLogfileptr_->start();
 			g_arrASyncLogs.push_back(asyncLogObj);
@@ -838,17 +848,17 @@ bool Logger::CreateLogObjs(const std::string& basepath, const std::string& based
 			g_vLogFiles.push_back(logobj.name_);
 
 			//创建目录.....
-			mkdir((basepath + basedir).c_str(), 0755);
-			mkdir((basepath + basedir + logobj.name_).c_str(), 0755);
+			mkdir((_basepath + basedir).c_str(), 0755);
+			mkdir((_basepath + basedir + logobj.name_).c_str(), 0755);
 
-			logobj.logfileptr_.reset(new mwnet_mt::LogFile((basepath + basedir + logobj.name_ + "/"), logobj.name_, 1024 * 1024 * g_roll_size, true, g_flush_freq, g_flush_every));
+			logobj.logfileptr_.reset(new mwnet_mt::LogFile((_basepath + basedir + logobj.name_ + "/"), logobj.name_, 1024 * 1024 * g_roll_size, true, g_flush_freq, g_flush_every, (g_zip_minute > 0 ? true : false)));
 
 			g_arrLogs.push_back(logobj);
 		}
 	}
 
-	std::string strBakPath = basepath + basedir + "baklog/";
-	std::string strBasePath = basepath + basedir;
+	std::string strBakPath = _basepath + basedir + "baklog/";
+	std::string strBasePath = _basepath + basedir;
 	mkdir(strBakPath.c_str(), 0755);
 
 	for (auto it : g_vLogFiles)
@@ -856,7 +866,7 @@ bool Logger::CreateLogObjs(const std::string& basepath, const std::string& based
 		mkdir((strBakPath + it).c_str(), 0755);
 	}
 
-	g_dealLogFile.SetParams(g_zip_day, g_save_day, strBakPath, strBasePath, g_vLogFiles);
+	g_dealLogFile.SetParams(g_zip_day, g_save_day, g_zip_minute, strBakPath, strBasePath, g_vLogFiles);
 	g_dealLogFile.StartJob();
 
 	return true;
@@ -887,7 +897,12 @@ Logger::~Logger()
 	pImpl->finish();
 	
 	g_FuncOutput(m_x, m_optype, pImpl->stream_.getbuffer());
-	
+
+	//致命&错误&警告级别及时落盘
+	if (pImpl->level_ == ERROR || pImpl->level_ == WARN)
+	{
+		g_FuncFlush(m_x, m_optype);
+	}
 	if (pImpl->level_ == FATAL)
 	{
 		g_FuncFlush(m_x, m_optype);
